@@ -1065,7 +1065,7 @@ export function UserManagementModule({ currentUserEmail }: { currentUserEmail: s
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.action}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{log.timestamp}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{log.details}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600"><div className="line-clamp-2 max-w-xl [overflow-wrap:anywhere]">{log.details}</div></td>
                   </tr>
                 ))}
                 {filteredActivityLogs.length === 0 && (

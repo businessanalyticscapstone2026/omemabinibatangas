@@ -155,3 +155,18 @@ test('Head Engineer account filter matches displayed roles and combines with sta
     const userFilter=document.querySelector('[aria-label="Filter by user"]');assert.ok(userFilter.classList.contains('w-40'));assert.ok(userFilter.querySelector('span').classList.contains('truncate')); const menu=document.querySelector('[data-test="user-filter-menu"]');assert.ok(menu.classList.contains('w-[var(--radix-dropdown-menu-trigger-width)]'));assert.ok(menu.classList.contains('min-w-0'));
   } finally {global.fetch=originalFetch;}
 });
+
+test('activity log details are displayed in a two-line clamp without altering the stored text', async () => {
+  const details = `Long maintenance details: ${'unbroken-text-'.repeat(100)}\nMore detail remains available in the log.`;
+  testLogs=[{id:'long',user:'alice',action:'Updated maintenance',timestamp:'2026-10-12T23:00:00Z',details}];
+  try {
+    await act(async()=>root.render(null));
+    await act(async()=>root.render(React.createElement(mod.exports.UserManagementModule,{currentUserEmail:'test@example.com'})));
+    await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Activity Logs')).click());
+    const content = document.querySelector('tbody tr td:last-child div');
+    assert.ok(content);
+    assert.ok(content.classList.contains('line-clamp-2'));
+    assert.ok(content.classList.contains('[overflow-wrap:anywhere]'));
+    assert.equal(content.textContent,details);
+  } finally { testLogs=[]; }
+});
