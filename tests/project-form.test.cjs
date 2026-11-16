@@ -18,7 +18,7 @@ function loadTs(relative, mocks = {}) {
   const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const m = new Module(filename, module); m.filename = filename; m.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalRequire = m.require.bind(m);
-  m.require = name => name === './FilterControls' ? { DateCalendarButton: () => null, StyledFilterSelect: ({label,value,onChange,options,disabled,title,triggerClassName}) => React.createElement('select', {'aria-label':label,value,disabled,title,className:triggerClassName,onChange:e=>onChange(e.target.value)}, options.map(o=>React.createElement('option',{key:o.value,value:o.value},o.label))) } : Object.hasOwn(mocks, name) ? mocks[name] : originalRequire(name);
+  m.require = name => name === './FilterControls' ? { DateCalendarButton: () => null, StyledFilterSelect: ({label,value,onChange,options,disabled,title,triggerClassName,onOpenChange}) => React.createElement('select', {'aria-label':label,value,disabled,title,className:triggerClassName,onClick:()=>onOpenChange?.(true),onChange:e=>onChange(e.target.value)}, options.map(o=>React.createElement('option',{key:o.value,value:o.value},o.label))) } : Object.hasOwn(mocks, name) ? mocks[name] : originalRequire(name);
   m._compile(code, filename); return m.exports;
 }
 const validation = loadTs('src/lib/project-form-validation.ts');
@@ -763,15 +763,35 @@ test('task 11: the Head Engineer project table carries the five columns and an i
   const assignedSelect=container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
   assert.equal(assignedSelect.value,'i1');assert.equal(assignedSelect.className,select.className);
 
+  let refreshes = 0;
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [{ ...item, inspectorId: 'i1' }], userRole: 'Head Engineer', inspectors: [], onRefreshInspectors: () => { refreshes += 1; } })));
+  const unavailableSelect = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
+  assert.doesNotMatch(unavailableSelect.textContent, /Juan Dela Cruz/);
+  assert.match(container.textContent, /Assigned inspector unavailable/);
+  await act(async () => unavailableSelect.click());
+  assert.equal(refreshes, 1);
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [item], userRole: 'Head Engineer', inspectors: [], inspectorListState: 'error' })));
+  assert.match(container.textContent, /Unable to load inspectors/);
+
   // @mine — the officer's flow: a project that is not validated yet cannot be assigned.
   await reset();
-  const pendingItem = { ...item, annualValidationEntries: [{ year: 2026, dueDate: '2026-03-01', result: 'Pending', remarks: '' }] };
+  const pendingItem = { ...item, actualCompletionDate: `${new Date().getUTCFullYear()}-01-01`, annualValidationEntries: [{ year: 2026, dueDate: '2026-03-01', result: 'Pending', remarks: '' }] };
   await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [pendingItem], userRole: 'Head Engineer' })));
   const pendingSelect = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
   assert.ok(pendingSelect);
   assert.equal(pendingSelect.disabled, true);
   assert.equal(pendingSelect.className,select.className);
   assert.match(pendingSelect.textContent, /Awaiting Validation/);
+
+  // Back-entered historical projects remain assignable even with pending annual validation.
+  await reset();
+  const historicalItem = { ...pendingItem, actualCompletionDate: '2022-03-31' };
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [historicalItem], userRole: 'Head Engineer' })));
+  const historicalSelect = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
+  assert.equal(historicalSelect.disabled, false);
+  assert.match(historicalSelect.textContent, /Juan Dela Cruz/);
+  await act(async () => { historicalSelect.value = 'i1'; historicalSelect.dispatchEvent(new window.Event('change', { bubbles: true })); });
+  assert.deepEqual(assignments.at(-1), ['p', 'i1']);
 
   // task 13: both project lists filter by completion date instead of location
   for (const userRole of ['Head Engineer', 'Staff - Encoder']) {

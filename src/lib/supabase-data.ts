@@ -37,7 +37,7 @@ const numStr = (v: unknown): string => (v === null || v === undefined ? '' : Str
 
 type Joined = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-function mapProject(p: Joined): StoredRecord {
+export function mapProject(p: Joined): StoredRecord {
   const road = (p.roads ?? {}) as Joined;
   const contractor = (p.contractors ?? {}) as Joined;
   // @mine — task 12: up to five free-text coverage locations, in their own order.
@@ -62,7 +62,7 @@ function mapProject(p: Joined): StoredRecord {
     locations: coverage,
     barangay: p.barangays?.name ?? '',
     // @mine — the single inspector assigned by the Head Engineer (WORKFLOW-DECISIONS Q3).
-    inspectorId: p.inspector_id ?? '',
+    inspectorId: p.inspector_id ?? p.deleted_inspector_id ?? '',
     dateBuilt: str(road.date_built),
     condition: cap(road.current_condition) || 'Good',
     lastInspection: str(road.last_inspection_date) || undefined,
@@ -973,12 +973,12 @@ export async function listInspectorOptions(admin: SupabaseClient): Promise<Array
   const { data, error } = await admin.from('profiles').select('id, username, role, status, full_name')
     .is('archived_at', null).eq('role', ROLE_TO_DB['Staff - Inspector']).order('username');
   if (error) throw error;
-  return (data ?? []).filter((row: Joined) => row.status !== 'inactive').map((row: Joined) => ({ id: String(row.id), name: String(row.full_name || row.username || row.id) }));
+  return (data ?? []).filter((row: Joined) => row.status !== 'inactive' && row.status !== 'locked').map((row: Joined) => ({ id: String(row.id), name: String(row.full_name || row.username || row.id) }));
 }
 
 /** @mine — assign, reassign or clear the single inspector of a project. */
 export async function setProjectInspector(db: SupabaseClient, projectId: string, inspectorId: string | null): Promise<void> {
-  const { error } = await db.from('projects').update({ inspector_id: inspectorId }).eq('id', projectId);
+  const { error } = await db.from('projects').update({ inspector_id: inspectorId, deleted_inspector_id: null }).eq('id', projectId);
   if (error) throw error;
 }
 
@@ -987,7 +987,7 @@ export async function findInspectorProfile(admin: SupabaseClient, inspectorId: s
   const { data, error } = await admin.from('profiles').select('id, username, role, status, full_name')
     .eq('id', inspectorId).is('archived_at', null).maybeSingle();
   if (error) throw error;
-  if (!data || data.status === 'inactive' || data.role !== ROLE_TO_DB['Staff - Inspector']) return null;
+  if (!data || (data.status === 'inactive' || data.status === 'locked') || data.role !== ROLE_TO_DB['Staff - Inspector']) return null;
   return { id: String(data.id), name: String(data.username ?? data.id) };
 }
 

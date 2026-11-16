@@ -51,6 +51,9 @@ test('only active Inspector accounts are offered for assignment', async () => {
     { id: 'i2', username: 'Maria', role: 'inspector', archived_at: null },
     { id: 'i1', username: 'Juan', role: 'inspector', archived_at: null },
     { id: 'e1', username: 'Ana', role: 'encoder', archived_at: null },
+    { id: 'i3', username: 'Inactive', role: 'inspector', status: 'inactive', archived_at: null },
+    { id: 'i4', username: 'Locked', role: 'inspector', status: 'locked', archived_at: null },
+    { id: 'i5', username: 'Archived', role: 'inspector', status: 'active', archived_at: '2026-01-01' },
   ];
   const options = await data.listInspectorOptions(profileDb(rows));
   assert.deepEqual(options, [{ id: 'i1', name: 'Juan' }, { id: 'i2', name: 'Maria' }]);
@@ -59,6 +62,29 @@ test('only active Inspector accounts are offered for assignment', async () => {
   // an account that is not an inspector can never be assigned
   assert.equal(await data.findInspectorProfile(profileDb(rows), 'e1'), null);
   assert.equal(await data.findInspectorProfile(profileDb(rows), 'missing'), null);
+  for (const id of ['i3', 'i4', 'i5']) assert.equal(await data.findInspectorProfile(profileDb(rows), id), null);
+  rows[0].role = 'encoder';
+  rows.splice(rows.findIndex(row => row.id === 'i1'), 1);
+  assert.deepEqual(await data.listInspectorOptions(profileDb(rows)), []);
+  assert.equal(await data.findInspectorProfile(profileDb(rows), 'i2'), null);
+  assert.equal(await data.findInspectorProfile(profileDb(rows), 'i1'), null);
+});
+
+test('deleted inspector markers survive mapping until an explicit assignment change', async () => {
+  const data = load('src/lib/supabase-data.ts', baseMocks);
+  const project = { id: 'p', inspector_id: null, deleted_inspector_id: 'deleted-i' };
+  assert.equal(data.mapProject(project).inspectorId, 'deleted-i');
+  assert.equal(data.mapProject({ ...project, inspector_id: 'new-i' }).inspectorId, 'new-i');
+  let update;
+  const db = { from: () => ({ update: value => ({ eq: async () => { update = value; return { error: null }; } }) }) };
+  await data.setProjectInspector(db, 'p', 'new-i');
+  assert.deepEqual(update, { inspector_id: 'new-i', deleted_inspector_id: null });
+  await data.setProjectInspector(db, 'p', null);
+  assert.deepEqual(update, { inspector_id: null, deleted_inspector_id: null });
+  const migration = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/20261118_preserve_deleted_inspector_assignment.sql'), 'utf8');
+  assert.match(migration, /before delete on public\.profiles/i);
+  assert.match(migration, /set deleted_inspector_id = old\.id/i);
+  assert.match(migration, /where inspector_id = old\.id/i);
 });
 
 function assignmentRoute(state) {
@@ -132,6 +158,24 @@ test('assignment is refused for other roles, unknown projects and non-inspector 
   state.roleDb = 'validator';
   assert.equal((await route.POST(request({ projectId: 'p', inspectorId: 'i1' }))).status, 403);
   assert.equal(state.writes.length, 0);
+});
+
+test('historical projects can be assigned without changing annual validation', async () => {
+  const entries = [{ year: 2023, result: 'Pending', dueDate: '2022-12-02', remarks: '' }, { year: 2024, result: 'Return for Revision', dueDate: '2023-12-02', remarks: 'Review' }];
+  const state = { roleDb: 'head_engineer', projects: [{ id: 'p', actualCompletionDate: '2022-12-31', annualValidationEntries: entries }], inspectors: ['i1'], writes: [], logs: [] };
+  assert.equal((await assignmentRoute(state).POST(request({ projectId: 'p', inspectorId: 'i1' }))).status, 200);
+  assert.deepEqual(state.writes, [{ projectId: 'p', inspectorId: 'i1' }]);
+  assert.deepEqual(state.projects[0].annualValidationEntries, entries);
+  state.projects[0].actualCompletionDate = `${new Date().getUTCFullYear()}-01-01`;
+  assert.equal((await assignmentRoute(state).POST(request({ projectId: 'p', inspectorId: 'i1' }))).status, 409);
+});
+
+test('historical assignment requires a valid actual completion date in a prior year', () => {
+  const { canAssignInspector } = load('src/lib/project-validation-workflow.ts');
+  const now = new Date('2026-07-01T00:00:00Z');
+  for (const date of ['2022-04-15', '2025-12-31']) assert.equal(canAssignInspector({ actualCompletionDate: date }, now), true);
+  for (const date of [undefined, '', '2022-02-30', '2026-01-01', '2027-01-01']) assert.equal(canAssignInspector({ actualCompletionDate: date }, now), false);
+  assert.equal(canAssignInspector({ validationResult: 'Validated' }, now), true);
 });
 
 test('the inspector list is readable by the Head Engineer only', async () => {

@@ -7,7 +7,7 @@ import { actionNote, notifyWorkflow } from '@/lib/notifications';
 import {
   addActivityLog, findInspectorProfile, listRoads, setProjectInspector,
 } from '@/lib/supabase-data';
-import { hasPassedValidation, type ValidationProject } from '@/lib/project-validation-workflow';
+import { canAssignInspector, type ValidationProject } from '@/lib/project-validation-workflow';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,9 +26,9 @@ export async function POST(request: Request) {
     const project = (await listRoads(auth.db, auth.admin)).find((record) => record.id === projectId);
     if (!project) return NextResponse.json({ message: 'Project not found.' }, { status: 404 });
 
-    // @mine — the officer's flow: an inspector is assigned only after the project has
-    // been validated. Clearing an assignment is always allowed.
-    if (inspectorId && !hasPassedValidation(project as unknown as ValidationProject)) {
+    // Historical completed projects may be assigned for back-entry; other projects
+    // still require validation. Clearing an assignment is always allowed.
+    if (inspectorId && !canAssignInspector(project as unknown as ValidationProject)) {
       return NextResponse.json({ message: 'This project has not been validated yet, so an inspector cannot be assigned.' }, { status: 409 });
     }
 
