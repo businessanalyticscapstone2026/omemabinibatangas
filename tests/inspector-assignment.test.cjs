@@ -51,6 +51,9 @@ test('only active Inspector accounts are offered for assignment', async () => {
     { id: 'i2', username: 'Maria', role: 'inspector', archived_at: null },
     { id: 'i1', username: 'Juan', role: 'inspector', archived_at: null },
     { id: 'e1', username: 'Ana', role: 'encoder', archived_at: null },
+    { id: 'i3', username: 'Inactive', role: 'inspector', status: 'inactive', archived_at: null },
+    { id: 'i4', username: 'Locked', role: 'inspector', status: 'locked', archived_at: null },
+    { id: 'i5', username: 'Archived', role: 'inspector', status: 'active', archived_at: '2026-01-01' },
   ];
   const options = await data.listInspectorOptions(profileDb(rows));
   assert.deepEqual(options, [{ id: 'i1', name: 'Juan' }, { id: 'i2', name: 'Maria' }]);
@@ -59,6 +62,12 @@ test('only active Inspector accounts are offered for assignment', async () => {
   // an account that is not an inspector can never be assigned
   assert.equal(await data.findInspectorProfile(profileDb(rows), 'e1'), null);
   assert.equal(await data.findInspectorProfile(profileDb(rows), 'missing'), null);
+  for (const id of ['i3', 'i4', 'i5']) assert.equal(await data.findInspectorProfile(profileDb(rows), id), null);
+  rows[0].role = 'encoder';
+  rows.splice(rows.findIndex(row => row.id === 'i1'), 1);
+  assert.deepEqual(await data.listInspectorOptions(profileDb(rows)), []);
+  assert.equal(await data.findInspectorProfile(profileDb(rows), 'i2'), null);
+  assert.equal(await data.findInspectorProfile(profileDb(rows), 'i1'), null);
 });
 
 function assignmentRoute(state) {
