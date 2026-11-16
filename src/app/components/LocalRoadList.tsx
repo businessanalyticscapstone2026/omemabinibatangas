@@ -1,5 +1,5 @@
 import { DateCalendarButton, StyledFilterSelect } from './FilterControls';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, Edit, Trash2, Search, MapPin, Download, Paperclip, Printer, ClipboardCheck, CalendarDays } from 'lucide-react';
 import { AutoGrowTextarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog';
@@ -80,8 +80,59 @@ interface LocalRoadListProps {
   // @mine — task 11: the Head Engineer assigns one inspector per project from the list.
   inspectors?: Array<{ id: string; name: string }>;
   inspectorListState?: 'loading' | 'ready' | 'error';
-  onRefreshInspectors?: () => void;
+  onRefreshInspectors?: () => Promise<Array<{ id: string; name: string }> | null>;
   onAssignInspector?: (projectId: string, inspectorId: string) => Promise<unknown> | unknown;
+}
+
+/** Open immediately, but never show cached inspector choices before revalidation. */
+function InspectorAssignmentSelect({ item, inspectors, listState, refresh, onAssign, assigning }: {
+  item: LocalRoad; inspectors: Array<{ id: string; name: string }>;
+  listState: 'loading' | 'ready' | 'error'; refresh?: () => Promise<Array<{ id: string; name: string }> | null>;
+  onAssign?: (projectId: string, inspectorId: string) => Promise<unknown> | unknown; assigning: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [menuInspectors, setMenuInspectors] = useState<Array<{ id: string; name: string }>>([]);
+  const request = useRef(0);
+  useEffect(() => () => { request.current += 1; }, []);
+  const handleOpenChange = async (nextOpen: boolean) => {
+    const current = ++request.current;
+    setOpen(nextOpen);
+    // Show the most recently verified choices immediately, then refresh them.
+    setMenuInspectors(nextOpen && listState === 'ready' ? inspectors : []);
+    setLoadError(false);
+    if (!nextOpen) return;
+    let refreshed: Array<{ id: string; name: string }> | null = null;
+    try { refreshed = refresh ? await refresh() : inspectors; } catch { refreshed = null; }
+    if (request.current !== current) return;
+    if (refreshed) setMenuInspectors(refreshed);
+    else { setMenuInspectors([]); setLoadError(true); }
+  };
+  const assignedInspector = inspectors.find(inspector => inspector.id === item.inspectorId);
+  const available = !item.inspectorId || Boolean(assignedInspector);
+  const displayValue = item.inspectorId
+    ? assignedInspector?.name ?? (listState === 'ready' ? 'Inspector unavailable' : 'Inspector')
+    : (canAssignInspector(item) ? 'Not Assigned' : 'Awaiting Validation');
+  return <>
+    <StyledFilterSelect
+      label={`Assign inspector for ${item.projectName || item.name}`}
+      triggerClassName="w-[192px] min-w-0"
+      value={item.inspectorId ? (available ? item.inspectorId : '') : '__unassigned__'}
+      placeholder={listState === 'ready' ? 'Inspector unavailable' : 'Inspector'}
+      displayValue={displayValue}
+      open={open}
+      onOpenChange={handleOpenChange}
+      disabled={!onAssign || assigning || listState === 'loading' || !canAssignInspector(item)}
+      title={canAssignInspector(item) ? undefined : 'Assign an inspector once the project is validated'}
+      onChange={value => { if (onAssign) void onAssign(item.id, value === '__unassigned__' ? '' : value); }}
+      options={[
+        { value: '__unassigned__', label: canAssignInspector(item) ? 'Not Assigned' : 'Awaiting Validation' },
+        ...(open ? menuInspectors : inspectors).map(inspector => ({ value: inspector.id, label: inspector.name })),
+      ]}
+    />
+    {loadError && <p role="alert" className="mt-1 text-xs text-red-700">Unable to load inspectors. Open the list to retry.</p>}
+    {listState === 'ready' && item.inspectorId && !available && <p className="mt-1 text-xs text-amber-700">Assigned inspector unavailable; select another or clear the assignment.</p>}
+  </>;
 }
 
 export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = false, validatorName = '', currentUser, onSaveValidation, userRole = '', inspectors = [], inspectorListState = 'ready', onRefreshInspectors, onAssignInspector }: LocalRoadListProps) {
@@ -718,28 +769,18 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                           {item.actualCompletionDate || item.completionDate || 'N/A'}
                         </td>
                         <td className="px-6 py-4" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                          <StyledFilterSelect
-                            label={`Assign inspector for ${item.projectName || item.name}`}
-                            triggerClassName="w-[192px] min-w-0"
-                            value={item.inspectorId ? (inspectors.some(inspector => inspector.id === item.inspectorId) ? item.inspectorId : '') : '__unassigned__'}
-                            placeholder={inspectorListState === 'loading' ? 'Loading inspectors…' : 'Inspector unavailable'}
-                            onOpenChange={(open) => { if (open) onRefreshInspectors?.(); }}
-                            disabled={!onAssignInspector || assigningId === item.id || !canAssignInspector(item)}
-                            title={canAssignInspector(item) ? undefined : 'Assign an inspector once the project is validated'}
-                            onChange={async (value) => {
-                              if (!onAssignInspector) return;
-                              setAssigningId(item.id);
-                              try { await onAssignInspector(item.id, value === '__unassigned__' ? '' : value); }
+                          <InspectorAssignmentSelect
+                            item={item}
+                            inspectors={inspectors}
+                            listState={inspectorListState}
+                            refresh={onRefreshInspectors}
+                            assigning={assigningId === item.id}
+                            onAssign={onAssignInspector ? async (projectId, inspectorId) => {
+                              setAssigningId(projectId);
+                              try { await onAssignInspector(projectId, inspectorId); }
                               finally { setAssigningId(null); }
-                            }}
-                            options={[
-                              {value: '__unassigned__', label: canAssignInspector(item) ? 'Not Assigned' : 'Awaiting Validation'},
-                              ...inspectors.map(inspector => ({value: inspector.id, label: inspector.name})),
-                            ]}
+                            } : undefined}
                           />
-                          {inspectorListState === 'loading' && <p role="status" className="mt-1 text-xs text-slate-500">Loading inspectors…</p>}
-                          {inspectorListState === 'error' && <p role="alert" className="mt-1 text-xs text-red-700">Unable to load inspectors. Open the list to retry.</p>}
-                          {inspectorListState === 'ready' && item.inspectorId && !inspectors.some(inspector => inspector.id === item.inspectorId) && <p className="mt-1 text-xs text-amber-700">Assigned inspector unavailable; select another or clear the assignment.</p>}
                         </td>
                         <td className="w-12 px-2 py-4 text-right" onClick={(event) => event.stopPropagation()}>
                           {['Admin', 'Head Engineer'].includes(userRole) && (

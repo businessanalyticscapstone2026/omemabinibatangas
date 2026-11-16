@@ -30,7 +30,12 @@ export function createUserClient(accessToken: string): SupabaseClient {
 
 export function createAdminClient(): SupabaseClient {
   if (!serviceRoleKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
-  return createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  // Admin reads govern account eligibility and must never reuse a framework fetch
+  // cache after an account has been deleted, archived, locked, or changed role.
+  return createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }) },
+  });
 }
 
 // App display role  <->  user_role enum

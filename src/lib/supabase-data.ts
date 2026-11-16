@@ -973,7 +973,7 @@ export async function listInspectorOptions(admin: SupabaseClient): Promise<Array
   const { data, error } = await admin.from('profiles').select('id, username, role, status, full_name')
     .is('archived_at', null).eq('role', ROLE_TO_DB['Staff - Inspector']).order('username');
   if (error) throw error;
-  return (data ?? []).filter((row: Joined) => row.status !== 'inactive' && row.status !== 'locked').map((row: Joined) => ({ id: String(row.id), name: String(row.full_name || row.username || row.id) }));
+  return (data ?? []).filter((row: Joined) => row.status === 'active').map((row: Joined) => ({ id: String(row.id), name: String(row.full_name || row.username || row.id) }));
 }
 
 /** @mine — assign, reassign or clear the single inspector of a project. */
@@ -987,7 +987,7 @@ export async function findInspectorProfile(admin: SupabaseClient, inspectorId: s
   const { data, error } = await admin.from('profiles').select('id, username, role, status, full_name')
     .eq('id', inspectorId).is('archived_at', null).maybeSingle();
   if (error) throw error;
-  if (!data || (data.status === 'inactive' || data.status === 'locked') || data.role !== ROLE_TO_DB['Staff - Inspector']) return null;
+  if (!data || data.status !== 'active' || data.role !== ROLE_TO_DB['Staff - Inspector']) return null;
   return { id: String(data.id), name: String(data.username ?? data.id) };
 }
 
