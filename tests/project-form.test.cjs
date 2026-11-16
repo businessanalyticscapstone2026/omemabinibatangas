@@ -18,7 +18,7 @@ function loadTs(relative, mocks = {}) {
   const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const m = new Module(filename, module); m.filename = filename; m.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalRequire = m.require.bind(m);
-  m.require = name => name === './FilterControls' ? { DateCalendarButton: () => null, StyledFilterSelect: ({label,value,onChange,options,disabled,title,triggerClassName}) => React.createElement('select', {'aria-label':label,value,disabled,title,className:triggerClassName,onChange:e=>onChange(e.target.value)}, options.map(o=>React.createElement('option',{key:o.value,value:o.value},o.label))) } : Object.hasOwn(mocks, name) ? mocks[name] : originalRequire(name);
+  m.require = name => name === './FilterControls' ? { DateCalendarButton: () => null, StyledFilterSelect: ({label,value,onChange,options,disabled,title,triggerClassName,onOpenChange}) => React.createElement('select', {'aria-label':label,value,disabled,title,className:triggerClassName,onClick:()=>onOpenChange?.(true),onChange:e=>onChange(e.target.value)}, options.map(o=>React.createElement('option',{key:o.value,value:o.value},o.label))) } : Object.hasOwn(mocks, name) ? mocks[name] : originalRequire(name);
   m._compile(code, filename); return m.exports;
 }
 const validation = loadTs('src/lib/project-form-validation.ts');
@@ -762,6 +762,16 @@ test('task 11: the Head Engineer project table carries the five columns and an i
   await act(async()=>root.render(React.createElement(LocalRoadList,{...props,data:[{...item,inspectorId:'i1'}],userRole:'Head Engineer'})));
   const assignedSelect=container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
   assert.equal(assignedSelect.value,'i1');assert.equal(assignedSelect.className,select.className);
+
+  let refreshes = 0;
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [{ ...item, inspectorId: 'i1' }], userRole: 'Head Engineer', inspectors: [], onRefreshInspectors: () => { refreshes += 1; } })));
+  const unavailableSelect = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
+  assert.doesNotMatch(unavailableSelect.textContent, /Juan Dela Cruz/);
+  assert.match(container.textContent, /Assigned inspector unavailable/);
+  await act(async () => unavailableSelect.click());
+  assert.equal(refreshes, 1);
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [item], userRole: 'Head Engineer', inspectors: [], inspectorListState: 'error' })));
+  assert.match(container.textContent, /Unable to load inspectors/);
 
   // @mine — the officer's flow: a project that is not validated yet cannot be assigned.
   await reset();

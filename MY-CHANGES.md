@@ -78,6 +78,20 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-16 — [mine] Preserve unavailable inspector assignment markers
+- **Type:** Modified
+- **Files:** `MY-CHANGES.md` (modified), `src/app/App.tsx` (modified), `src/app/components/FilterControls.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/lib/supabase-data.ts` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/project-form.test.cjs` (modified), `supabase/migrations/20261118_preserve_deleted_inspector_assignment.sql` (new)
+- **What & why:** Preserve deleted inspector references for an explicit unavailable notice, and clear that marker only on an explicit reassignment or unassignment. An additive database migration is required before deploying this code.
+- **Status:** ✅ Kept
+- **Original code affected:** Project inspector mapping and assignment persistence.
+
+### 2026-11-16 — [mine] Refresh inspector options for project assignment
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/components/FilterControls.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/lib/supabase-data.ts` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Reload inspector options when the Head Engineer opens the selector, exclude inactive, locked, archived and changed-role accounts, and show load failures or unavailable assignments without silently changing project data.
+- **Status:** ✅ Kept
+- **Original code affected:** Inspector lookup and project assignment dropdown.
+
 ### 2026-11-16 — [mine] Allow inspector assignment for historical projects
 - **Type:** Modified
 - **Files:** `src/app/api/local-road/inspector-assignment/route.ts` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
