@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-16 — [mine] Show preloaded inspectors immediately
+- **Type:** Modified
+- **Files:** `src/app/components/LocalRoadList.tsx` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Show the most recently verified inspector list as soon as the assignment dropdown opens, refresh it in the background, and clear it on refresh failure.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-16 — [mine] Bypass server cache for admin account reads
 - **Type:** Modified
 - **Files:** `src/lib/supabase.ts` (modified), `tests/inspector-assignment.test.cjs` (modified)

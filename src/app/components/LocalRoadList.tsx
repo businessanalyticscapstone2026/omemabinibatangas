@@ -98,14 +98,15 @@ function InspectorAssignmentSelect({ item, inspectors, listState, refresh, onAss
   const handleOpenChange = async (nextOpen: boolean) => {
     const current = ++request.current;
     setOpen(nextOpen);
-    setMenuInspectors([]);
+    // Show the most recently verified choices immediately, then refresh them.
+    setMenuInspectors(nextOpen && listState === 'ready' ? inspectors : []);
     setLoadError(false);
     if (!nextOpen) return;
     let refreshed: Array<{ id: string; name: string }> | null = null;
     try { refreshed = refresh ? await refresh() : inspectors; } catch { refreshed = null; }
     if (request.current !== current) return;
     if (refreshed) setMenuInspectors(refreshed);
-    else setLoadError(true);
+    else { setMenuInspectors([]); setLoadError(true); }
   };
   const assignedInspector = inspectors.find(inspector => inspector.id === item.inspectorId);
   const available = !item.inspectorId || Boolean(assignedInspector);
@@ -121,7 +122,7 @@ function InspectorAssignmentSelect({ item, inspectors, listState, refresh, onAss
       displayValue={displayValue}
       open={open}
       onOpenChange={handleOpenChange}
-      disabled={!onAssign || assigning || !canAssignInspector(item)}
+      disabled={!onAssign || assigning || listState === 'loading' || !canAssignInspector(item)}
       title={canAssignInspector(item) ? undefined : 'Assign an inspector once the project is validated'}
       onChange={value => { if (onAssign) void onAssign(item.id, value === '__unassigned__' ? '' : value); }}
       options={[

@@ -774,7 +774,7 @@ test('task 11: the Head Engineer project table carries the five columns and an i
   await act(async () => { unavailableSelect.click(); });
   assert.match(container.textContent, /Unable to load inspectors/);
 
-  // The menu opens immediately but contains no cached inspector names while fetching.
+  // Previously loaded names appear immediately; a fresh response replaces them.
   await reset();
   let completeRefresh;
   const pendingRefresh = new Promise(resolve => { completeRefresh = resolve; });
@@ -783,7 +783,7 @@ test('task 11: the Head Engineer project table carries the five columns and an i
   const guarded = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
   await act(async () => { guarded.click(); });
   assert.equal(guarded.dataset.open, 'true');
-  assert.doesNotMatch(guarded.textContent, /Deleted Inspector/);
+  assert.match(guarded.textContent, /Deleted Inspector/);
   assert.doesNotMatch(container.textContent, /Loading inspectors/i);
   await act(async () => {
     root.render(React.createElement(LocalRoadList, { ...staleProps, inspectors: [{ id: 'new', name: 'Registered Inspector' }], userRole: 'Head Engineer' }));
@@ -793,6 +793,23 @@ test('task 11: the Head Engineer project table carries the five columns and an i
   assert.equal(guarded.dataset.open, 'true');
   assert.doesNotMatch(guarded.textContent, /Deleted Inspector/);
   assert.match(guarded.textContent, /Registered Inspector/);
+
+  // Do not open an empty menu while the initial list is still being loaded.
+  await reset();
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, inspectors: [], inspectorListState: 'loading', userRole: 'Head Engineer' })));
+  assert.equal(container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]').disabled, true);
+
+  // A failed background refresh removes cached choices and offers retry.
+  await reset();
+  let failRefresh;
+  const failure = new Promise(resolve => { failRefresh = resolve; });
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, userRole: 'Head Engineer', onRefreshInspectors: () => failure })));
+  const failureSelect = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
+  await act(async () => failureSelect.click());
+  assert.match(failureSelect.textContent, /Juan Dela Cruz/);
+  await act(async () => { failRefresh(null); await failure; });
+  assert.doesNotMatch(failureSelect.textContent, /Juan Dela Cruz/);
+  assert.match(container.textContent, /Unable to load inspectors/);
 
   // @mine — the officer's flow: a project that is not validated yet cannot be assigned.
   await reset();
