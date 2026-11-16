@@ -18,7 +18,7 @@ function loadTs(relative, mocks = {}) {
   const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   const m = new Module(filename, module); m.filename = filename; m.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalRequire = m.require.bind(m);
-  m.require = name => name === './FilterControls' ? { DateCalendarButton: () => null, StyledFilterSelect: ({label,value,onChange,options,disabled,title,triggerClassName,onOpenChange}) => React.createElement('select', {'aria-label':label,value,disabled,title,className:triggerClassName,onClick:()=>onOpenChange?.(true),onChange:e=>onChange(e.target.value)}, options.map(o=>React.createElement('option',{key:o.value,value:o.value},o.label))) } : Object.hasOwn(mocks, name) ? mocks[name] : originalRequire(name);
+  m.require = name => name === './FilterControls' ? { DateCalendarButton: () => null, StyledFilterSelect: ({label,value,onChange,options,disabled,title,triggerClassName,onOpenChange,open}) => React.createElement('select', {'aria-label':label,value,disabled,title,className:triggerClassName,'data-open':String(open),onClick:()=>onOpenChange?.(true),onChange:e=>onChange(e.target.value)}, options.map(o=>React.createElement('option',{key:o.value,value:o.value},o.label))) } : Object.hasOwn(mocks, name) ? mocks[name] : originalRequire(name);
   m._compile(code, filename); return m.exports;
 }
 const validation = loadTs('src/lib/project-form-validation.ts');
@@ -764,14 +764,34 @@ test('task 11: the Head Engineer project table carries the five columns and an i
   assert.equal(assignedSelect.value,'i1');assert.equal(assignedSelect.className,select.className);
 
   let refreshes = 0;
-  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [{ ...item, inspectorId: 'i1' }], userRole: 'Head Engineer', inspectors: [], onRefreshInspectors: () => { refreshes += 1; } })));
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [{ ...item, inspectorId: 'i1' }], userRole: 'Head Engineer', inspectors: [], onRefreshInspectors: async () => { refreshes += 1; return true; } })));
   const unavailableSelect = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
   assert.doesNotMatch(unavailableSelect.textContent, /Juan Dela Cruz/);
   assert.match(container.textContent, /Assigned inspector unavailable/);
   await act(async () => unavailableSelect.click());
   assert.equal(refreshes, 1);
-  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [item], userRole: 'Head Engineer', inspectors: [], inspectorListState: 'error' })));
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [item], userRole: 'Head Engineer', inspectors: [], inspectorListState: 'error', onRefreshInspectors: async () => false })));
+  await act(async () => { unavailableSelect.click(); });
   assert.match(container.textContent, /Unable to load inspectors/);
+
+  // A fresh list must arrive before the menu opens; the page never flashes a loading label.
+  await reset();
+  let completeRefresh;
+  const pendingRefresh = new Promise(resolve => { completeRefresh = resolve; });
+  const staleProps = { ...props, inspectors: [{ id: 'old', name: 'Deleted Inspector' }], onRefreshInspectors: () => pendingRefresh };
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...staleProps, userRole: 'Head Engineer' })));
+  const guarded = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
+  await act(async () => { guarded.click(); });
+  assert.equal(guarded.dataset.open, 'false');
+  assert.doesNotMatch(container.textContent, /Loading inspectors/i);
+  await act(async () => {
+    root.render(React.createElement(LocalRoadList, { ...staleProps, inspectors: [{ id: 'new', name: 'Registered Inspector' }], userRole: 'Head Engineer' }));
+    completeRefresh(true);
+    await pendingRefresh;
+  });
+  assert.equal(guarded.dataset.open, 'true');
+  assert.doesNotMatch(guarded.textContent, /Deleted Inspector/);
+  assert.match(guarded.textContent, /Registered Inspector/);
 
   // @mine — the officer's flow: a project that is not validated yet cannot be assigned.
   await reset();

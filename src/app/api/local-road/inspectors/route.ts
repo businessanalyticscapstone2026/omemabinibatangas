@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   if (auth.profile.roleDb !== 'head_engineer') return forbidden();
   try {
     const data = await listInspectorOptions(auth.admin);
-    return withRefresh(NextResponse.json({ data }), auth);
+    return withRefresh(NextResponse.json({ data }, { headers: { 'Cache-Control': 'private, no-store' } }), auth);
   } catch (error) {
     console.error('Failed to load inspectors.', error);
     return NextResponse.json({ message: 'Unable to load the inspector list.' }, { status: 500 });
