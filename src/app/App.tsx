@@ -1,7 +1,7 @@
 'use client';
 import { loadRecords } from '@/lib/load-records';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CalendarDays, Clock3 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 
@@ -219,36 +219,23 @@ export default function App() {
     };
   }, []);
 
-  // Re-read accounts when the selector opens, including changes made in another session.
-  const inspectorRequest = useRef(0);
-  const [inspectorListState, setInspectorListState] = useState<'loading' | 'ready' | 'error'>('loading');
-  const refreshInspectors = useCallback(async () => {
-    if (!isLoggedIn || userRole !== 'Head Engineer') return;
-    const request = ++inspectorRequest.current;
-    setInspectors([]);
-    setInspectorListState('loading');
-    try {
-      const response = await fetch('/api/local-road/inspectors', { cache: 'no-store' });
-      if (!response.ok) throw new Error(`Request failed (${response.status}).`);
-      const payload = await response.json();
-      if (!Array.isArray(payload.data)) throw new Error('Invalid inspector list.');
-      if (inspectorRequest.current === request) {
-        setInspectors(payload.data);
-        setInspectorListState('ready');
-      }
-    } catch (error) {
-      console.error('Failed to load inspectors.', error);
-      if (inspectorRequest.current === request) setInspectorListState('error');
-    }
-  }, [isLoggedIn, userRole]);
-
+  // @mine — task 11: the assignment dropdown needs the registered inspectors.
   useEffect(() => {
     if (!isLoggedIn || userRole !== 'Head Engineer') return;
+    let active = true;
+    const refreshInspectors = async () => {
+      try {
+        const response = await fetch('/api/local-road/inspectors', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Request failed (${response.status}).`);
+        const payload = await response.json();
+        if (active && Array.isArray(payload.data)) setInspectors(payload.data);
+      } catch (error) { console.error('Failed to load inspectors.', error); }
+    };
     void refreshInspectors();
     window.addEventListener('focus', refreshInspectors);
-    return () => { ++inspectorRequest.current; window.removeEventListener('focus', refreshInspectors); };
-  }, [isLoggedIn, userRole, activeTab, refreshInspectors]);
-
+    return () => { active = false; window.removeEventListener('focus', refreshInspectors); };
+    // Refresh accounts added since login when returning to this window/module.
+  }, [isLoggedIn, userRole, activeTab]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -763,8 +750,6 @@ export default function App() {
                   currentUser={userName}
                   userRole={userRole}
                   inspectors={inspectors}
-                  inspectorListState={inspectorListState}
-                  onRefreshInspectors={refreshInspectors}
                   onAssignInspector={handleAssignInspector}
                 />
               )}

@@ -79,12 +79,10 @@ interface LocalRoadListProps {
   userRole?: string;
   // @mine — task 11: the Head Engineer assigns one inspector per project from the list.
   inspectors?: Array<{ id: string; name: string }>;
-  inspectorListState?: 'loading' | 'ready' | 'error';
-  onRefreshInspectors?: () => void;
   onAssignInspector?: (projectId: string, inspectorId: string) => Promise<unknown> | unknown;
 }
 
-export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = false, validatorName = '', currentUser, onSaveValidation, userRole = '', inspectors = [], inspectorListState = 'ready', onRefreshInspectors, onAssignInspector }: LocalRoadListProps) {
+export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = false, validatorName = '', currentUser, onSaveValidation, userRole = '', inspectors = [], onAssignInspector }: LocalRoadListProps) {
   // @mine — Head Engineer is the actual session label for the Admin role.
   const isAdminReadDeleteOnly = ['Admin', 'Head Engineer'].includes(userRole) && !validationMode;
   const [searchTerm, setSearchTerm] = useState('');
@@ -721,9 +719,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                           <StyledFilterSelect
                             label={`Assign inspector for ${item.projectName || item.name}`}
                             triggerClassName="w-[192px] min-w-0"
-                            value={item.inspectorId ? (inspectors.some(inspector => inspector.id === item.inspectorId) ? item.inspectorId : '') : '__unassigned__'}
-                            placeholder={inspectorListState === 'loading' ? 'Loading inspectors…' : 'Inspector unavailable'}
-                            onOpenChange={(open) => { if (open) onRefreshInspectors?.(); }}
+                            value={item.inspectorId || '__unassigned__'}
                             disabled={!onAssignInspector || assigningId === item.id || !canAssignInspector(item)}
                             title={canAssignInspector(item) ? undefined : 'Assign an inspector once the project is validated'}
                             onChange={async (value) => {
@@ -737,9 +733,6 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                               ...inspectors.map(inspector => ({value: inspector.id, label: inspector.name})),
                             ]}
                           />
-                          {inspectorListState === 'loading' && <p role="status" className="mt-1 text-xs text-slate-500">Loading inspectors…</p>}
-                          {inspectorListState === 'error' && <p role="alert" className="mt-1 text-xs text-red-700">Unable to load inspectors. Open the list to retry.</p>}
-                          {inspectorListState === 'ready' && item.inspectorId && !inspectors.some(inspector => inspector.id === item.inspectorId) && <p className="mt-1 text-xs text-amber-700">Assigned inspector unavailable; select another or clear the assignment.</p>}
                         </td>
                         <td className="w-12 px-2 py-4 text-right" onClick={(event) => event.stopPropagation()}>
                           {['Admin', 'Head Engineer'].includes(userRole) && (
