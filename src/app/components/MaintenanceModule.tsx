@@ -52,6 +52,7 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
   const submittingRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [selectedInspectionId, setSelectedInspectionId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const filterDateRef = useRef<HTMLInputElement>(null);
@@ -133,7 +134,8 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
 
   const selectedProject = localRoadList.find(item => item.id === formData.localRoadId);
   const editingRecord = editingRecordId ? maintenanceRecords.find(record => record.id === editingRecordId) : undefined;
-  const linkedInspectionId = editingRecord ? editingRecord.inspectionId : eligibleInspections.find(item => item.localRoadId === formData.localRoadId)?.id;
+  const projectInspections = eligibleInspections.filter(item => item.localRoadId === formData.localRoadId);
+  const linkedInspectionId = editingRecord ? editingRecord.inspectionId : projectInspections.find(item => item.id === selectedInspectionId)?.id || projectInspections[0]?.id;
   const linkedInspection = [...inspections, ...scheduledArchivedInspections].find(item => item.id === linkedInspectionId && item.localRoadId === formData.localRoadId);
   const minimumMaintenanceDate = linkedInspection ? addCalendarDays(linkedInspection.date, 1) : null;
   const inspectionUnavailable = !!editingRecord?.inspectionId && !minimumMaintenanceDate;
@@ -212,6 +214,7 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
     const selected = localRoadList.find(item => item.id === projectId);
 
     setProjectError('');
+    setSelectedInspectionId('');
     setFormData(prev => ({
       ...prev,
       localRoadId: projectId,
@@ -231,6 +234,7 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
 
   const resetForm = () => {
     setEditingRecordId(null);
+    setSelectedInspectionId('');
     setProjectError('');
     setActivityError('');
     setFormData({
@@ -294,7 +298,7 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
 
     const localRoad = localRoadList.find(item => item.id === formData.localRoadId);
     if (localRoad) {
-      const inspection = eligibleInspections.find(item => item.localRoadId === localRoad.id);
+      const inspection = projectInspections.find(item => item.id === linkedInspectionId);
       if (!editingRecordId && !inspection) { setProjectError('This inspection is no longer available for scheduling. Refresh and try again.'); return; }
       const recordDetails = {
         ...(editingRecordId ? {} : { inspectionId: inspection?.id }),
@@ -516,6 +520,12 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
               <section ref={activitySectionRef} className="scroll-mt-4 pt-5">
                 <h3 className="text-[1.05rem] font-bold mb-3 text-gray-900">Maintenance Activity Information</h3>
 
+                {!editingRecordId && projectInspections.length > 1 && <div className="mb-3">
+                  <label htmlFor="maintenance-inspection" className="block text-xs font-medium text-gray-700 mb-1">Inspection record</label>
+                  <select id="maintenance-inspection" className="w-full rounded-sm border border-gray-300 bg-white p-2" value={linkedInspectionId || ''} onChange={event => setSelectedInspectionId(event.target.value)}>
+                    {projectInspections.map(item => <option key={item.id} value={item.id}>{item.date}{item.annualFollowUpYear ? ` (Follow-up ${item.annualFollowUpYear})` : ''}</option>)}
+                  </select>
+                </div>}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Date Started{editingRecordId ? ' *' : ''}</label>
@@ -807,7 +817,7 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
                           </button>
                         )}
                         {record.status === 'In Progress' && (
-                          <button type="button" onClick={(event) => { event.stopPropagation(); if (!hasFourDigitYear(record.dateStarted || '') || !hasFourDigitYear(record.scheduledDate) || !record.type?.trim() || !record.description?.trim() || !record.remarks?.trim()) { window.alert('Complete the maintenance information before marking it completed.'); return; } onUpdateStatus(record.id, 'Completed', new Date().toISOString().split('T')[0]); }} aria-label={`Complete maintenance for ${record.localRoadName}`} title="Complete" className="rounded-md p-2 text-slate-500 hover:text-emerald-700"><CheckCircle2 className="h-4 w-4" aria-hidden="true" /></button>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); if (!hasFourDigitYear(record.dateStarted || '') || !hasFourDigitYear(record.scheduledDate) || !record.type?.trim() || !record.description?.trim() || !record.remarks?.trim()) { window.alert('Complete the maintenance information before marking it completed.'); return; } onUpdateStatus(record.id, 'Completed', record.scheduledDate); }} aria-label={`Complete maintenance for ${record.localRoadName}`} title="Complete" className="rounded-md p-2 text-slate-500 hover:text-emerald-700"><CheckCircle2 className="h-4 w-4" aria-hidden="true" /></button>
                         )}
                         {record.status !== 'Completed' && record.status !== 'Deferred' && (
                           <button type="button" onClick={(event) => { event.stopPropagation(); onUpdateStatus(record.id, 'Deferred'); }} aria-label={`Defer maintenance for ${record.localRoadName}`} title="Defer" className="rounded-md p-2 text-slate-500 hover:text-amber-700"><Pause className="h-4 w-4" aria-hidden="true" /></button>

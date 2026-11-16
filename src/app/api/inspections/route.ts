@@ -20,8 +20,15 @@ function earliestInspectionDate(road: StoredRecord, payload: StoredRecord, exist
   const completed = String(road.actualCompletionDate || '');
   if (!hasFourDigitYear(completed)) return null;
   const requested = Number(existing?.annualFollowUpYear || payload.annualFollowUpYear);
-  const year = Number.isInteger(requested) && requested > 0 ? requested : Number(completed.slice(0, 4)) + 1;
+  const firstYear = Number(completed.slice(0, 4)) + 1;
+  const year = Number.isInteger(requested) && requested > 0 ? requested : firstYear;
+  if (year < firstYear) return null;
   return anniversaryMinusDays(completed, year, INSPECTION_DAYS_BEFORE);
+}
+
+function annualYearIsValidated(road: StoredRecord, year: unknown): boolean {
+  if (!year || !Array.isArray(road.annualValidationEntries)) return true; // Legacy records without annual metadata.
+  return road.annualValidationEntries.some((entry: any) => Number(entry.year) === Number(year) && entry.result === 'Validated');
 }
 
 export const runtime = 'nodejs';
@@ -118,6 +125,7 @@ export async function POST(request: Request) {
   if (notAssignedToInspector(auth, road)) {
     return NextResponse.json({ message: 'This project is not assigned to you.' }, { status: 403 });
   }
+  if (!annualYearIsValidated(road, payload.annualFollowUpYear)) return NextResponse.json({ message: 'The annual validation for this inspection year must be approved first.' }, { status: 409 });
   const minimum = earliestInspectionDate(road, payload);
   if (!minimum) return NextResponse.json({ message: 'The project completion date could not be verified.' }, { status: 400 });
   if (payload.date < minimum) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
@@ -162,6 +170,7 @@ export async function PUT(request: Request) {
   if (notAssignedToInspector(auth, road)) {
     return NextResponse.json({ message: 'This project is not assigned to you.' }, { status: 403 });
   }
+  if (existing.isScheduledAnnualFollowUp && !annualYearIsValidated(road, existing.annualFollowUpYear)) return NextResponse.json({ message: 'The annual validation for this inspection year must be approved first.' }, { status: 409 });
   const minimum = earliestInspectionDate(road, payload, existing);
   if (!minimum) return NextResponse.json({ message: 'The project completion date could not be verified.' }, { status: 400 });
   if (payload.date < minimum) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
@@ -173,7 +182,7 @@ export async function PUT(request: Request) {
     if (existing.date !== payload.date) {
       const minMaintenance = addCalendarDays(payload.date as string, 1);
       const [active, archived] = await Promise.all([listMaintenance(auth.admin), listArchivedMaintenance(auth.admin)]);
-      if (!minMaintenance || [...active, ...archived].some(item => item.inspectionId === existing.id && [item.dateStarted, item.scheduledDate].some(date => typeof date === 'string' && date && date < minMaintenance))) {
+      if (!minMaintenance || [...active, ...archived].some(item => item.inspectionId === existing.id && [item.dateStarted, item.scheduledDate, item.completedDate].some(date => typeof date === 'string' && date && date < minMaintenance))) {
         return NextResponse.json({ message: 'This inspection date conflicts with linked maintenance dates.' }, { status: 409 });
       }
     }

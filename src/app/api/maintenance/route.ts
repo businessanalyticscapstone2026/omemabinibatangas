@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   try {
     const [inspections, active, archived, archivedInspections] = await Promise.all([listInspections(auth.db), listMaintenance(auth.db), listArchivedMaintenance(auth.db), listArchivedInspections(auth.db)]);
     const scheduledIds = [...active, ...archived].map(item => item.inspectionId).filter((id): id is string => typeof id === 'string');
-    const eligible = eligibleMaintenanceInspections(inspections as any[], scheduledIds, archivedInspections as any[]).find(item => item.localRoadId === payload.localRoadId);
+    const eligible = eligibleMaintenanceInspections(inspections as any[], scheduledIds, archivedInspections as any[]).find(item => item.localRoadId === payload.localRoadId && item.id === payload.inspectionId);
     if (!eligible || eligible.id !== payload.inspectionId) {
       return NextResponse.json({ message: 'This inspection is no longer available for scheduling. Refresh and try again.' }, { status: 409 });
     }
@@ -80,6 +80,13 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ message: 'A valid maintenance status is required.' }, { status: 400 });
       }
       if (payload.completedDate != null && payload.completedDate !== '' && (typeof payload.completedDate !== 'string' || !hasFourDigitYear(payload.completedDate))) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
+      if (payload.completedDate && record.inspectionId) {
+        const [activeInspections, archivedInspections] = await Promise.all([listInspections(auth.db), listArchivedInspections(auth.db)]);
+        const linked = [...activeInspections, ...archivedInspections].find(item => item.id === record.inspectionId && item.localRoadId === record.localRoadId);
+        const minimum = linked && addCalendarDays(String(linked.date || ''), 1);
+        if (!minimum) return NextResponse.json({ message: 'The linked inspection date could not be verified.' }, { status: 409 });
+        if (String(payload.completedDate) < minimum) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
+      }
       const allowed: Record<string, string[]> = { Scheduled: ['In Progress', 'Deferred'], Deferred: ['In Progress'], 'In Progress': ['Completed', 'Deferred'], Completed: [] };
       if (!allowed[String(record.status)]?.includes(String(payload.status))) return NextResponse.json({ message: 'This status change is not allowed.' }, { status: 409 });
       if (payload.status === 'Completed' && (!hasFourDigitYear(String(record.dateStarted || '')) || !hasFourDigitYear(String(record.scheduledDate || '')) || !String(record.type || '').trim() || !String(record.description || '').trim() || !String(record.remarks || '').trim())) return NextResponse.json({ message: 'Complete the maintenance information before marking it completed.' }, { status: 409 });

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PrintDocument, type PrintSection } from './PrintDocument';
 import { recordClientActivity } from '@/lib/activity-log-client';
-import { latestByProject, isPendingInspection, findingsSummary } from '@/lib/inspection-selection';
+import { inspectionCardsByValidation, isPendingInspection, findingsSummary } from '@/lib/inspection-selection';
 import { hasFourDigitYear, anniversaryMinusDays, INSPECTION_DAYS_BEFORE, formatSavedProjectCurrency } from '@/lib/project-form-validation';
 import { attachmentError } from '@/lib/attachment-validation';
 
@@ -286,7 +286,7 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
   useEffect(() => {
     if (!showForm) return;
     formScrollRef.current?.scrollTo({ top: 0 });
-  }, [showForm, editingInspection]);
+  }, [showForm]);
 
   const moveToFormTab = (index: number) => {
     const scrollContainer = formScrollRef.current;
@@ -355,7 +355,7 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
     ? datedInspections.filter(inspection => !isPendingInspectionRecord(inspection) && inspection.date?.slice(0, 4) === overviewPrintYear)
     : datedInspections;
   const originalOrder = new Map(inspections.slice().reverse().map((inspection, index) => [inspection.id, index]));
-  const filteredInspections = latestByProject(yearInspections)
+  const filteredInspections = inspectionCardsByValidation(yearInspections, localRoadList)
     .slice()
     .reverse()
     .map((inspection) => ({
@@ -887,6 +887,7 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                             max="9999-12-31"
                             onInvalid={e => e.currentTarget.setCustomValidity(e.currentTarget.validity.valueMissing ? 'Please fill out this field.' : 'Please fill out valid date.')}
                             onInput={e => e.currentTarget.setCustomValidity('')}
+                            key={editingInspection?.id || 'new-inspection'}
                             defaultValue={formData.date}
                             onChange={(e) => { if (e.target.value) setFormData(prev => ({ ...prev, date: e.target.value })); }}
                             onBlur={(e) => { if (!e.target.value) setFormData(prev => ({ ...prev, date: '' })); }}

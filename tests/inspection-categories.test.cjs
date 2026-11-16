@@ -391,3 +391,20 @@ test('inspection road name is below the network ID in edit, view and print', asy
   assert.ok(editRoad.querySelector('.space-y-3'));assert.match(editRoad.textContent,/Road Network ID No\.Road Name/);assert.equal(editRoad.querySelector('.space-y-3').querySelectorAll('textarea[readonly]').length,2);
   act(()=>root.unmount());container.remove();
 });
+
+
+test('inspection card and date use the validated annual year without a year selector', () => {
+  const old = { ...pendingInspection, id:'old', annualFollowUpYear:2024, date:'2024-07-06' };
+  const newest = { ...pendingInspection, id:'new', annualFollowUpYear:2026, date:'2026-07-06' };
+  const container = document.createElement('div'); document.body.appendChild(container);
+  const root = createRoot(container);
+  const props = {inspections:[old,newest],localRoadList:[{id:'road-1',name:'Road',actualCompletionDate:'2023-08-04',annualValidationEntries:[{year:2024,result:'Validated'},{year:2026,result:'Pending'}]}],onAddInspection(){},onEditInspection:async()=>true,onDeleteInspection:async()=>true,currentUser:'Inspector',userRole:'Staff - Inspector'};
+  act(()=>root.render(React.createElement(InspectionModule,props)));
+  assert.match(container.textContent,/Annual Follow-up · 2024/);
+  assert.doesNotMatch(container.textContent,/Annual Follow-up · 2026/);
+  openPendingForm(container);
+  assert.equal(container.querySelector('#inspection-follow-up-year'),null);
+  const input=[...container.querySelectorAll('input[type=date]')].find(item=>item.required);
+  assert.equal(input.min,'2024-07-06');
+  act(()=>root.unmount()); container.remove();
+});

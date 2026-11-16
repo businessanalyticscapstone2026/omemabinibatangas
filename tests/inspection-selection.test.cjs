@@ -104,3 +104,28 @@ test('annual offsets are exact days before the anniversary, every year, clamping
   assert.equal(anniversaryMinusDays('2026-11-11', 1990, 30), null);
   assert.equal(anniversaryMinusDays('', 2027, 30), null);
 });
+
+test('historical inspections can be scheduled after newer years without duplicating a year', () => {
+  const {eligibleMaintenanceInspections} = load('src/lib/inspection-selection.ts');
+  const older = {id:'old',localRoadId:'p',date:'2024-06-01',annualFollowUpYear:2024,conditionRatings:{A:'Fair'}};
+  const newer = {...older,id:'new',date:'2026-06-01',annualFollowUpYear:2026};
+  const duplicate = {...older,id:'duplicate',date:'2026-06-02',annualFollowUpYear:2026};
+  assert.deepEqual(eligibleMaintenanceInspections([older,newer],['new']).map(i=>i.id),['old']);
+  assert.deepEqual(eligibleMaintenanceInspections([older,duplicate],['new'],[newer]).map(i=>i.id),['old']);
+  assert.deepEqual(eligibleMaintenanceInspections([older,newer],[]).map(i=>i.id),['new','old']);
+});
+
+test('inspection card follows the earliest validated pending annual year, preserving completed history', () => {
+  const {inspectionCardsByValidation} = load('src/lib/inspection-selection.ts');
+  const old = {id:'2024',localRoadId:'p',date:'2024-07-06',annualFollowUpYear:2024,isScheduledAnnualFollowUp:true};
+  const newer = {...old,id:'2026',date:'2026-07-06',annualFollowUpYear:2026};
+  const roads = [{id:'p',annualValidationEntries:[{year:2024,result:'Validated'},{year:2026,result:'Pending'}]}];
+  assert.deepEqual(inspectionCardsByValidation([old,newer],roads).map(i=>i.id),['2024']);
+  assert.deepEqual(inspectionCardsByValidation([old,newer],[{id:'p',annualValidationEntries:[]}]),[]);
+  roads[0].annualValidationEntries[1].result='Validated';
+  assert.deepEqual(inspectionCardsByValidation([old,newer],roads).map(i=>i.id),['2024']);
+  const finished = {...old,isScheduledAnnualFollowUp:false};
+  assert.deepEqual(inspectionCardsByValidation([finished,newer],roads).map(i=>i.id),['2026']);
+  roads[0].annualValidationEntries[1].result='Pending';
+  assert.deepEqual(inspectionCardsByValidation([finished,newer],roads).map(i=>i.id),['2024']);
+});
