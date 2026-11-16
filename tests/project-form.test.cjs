@@ -765,13 +765,23 @@ test('task 11: the Head Engineer project table carries the five columns and an i
 
   // @mine — the officer's flow: a project that is not validated yet cannot be assigned.
   await reset();
-  const pendingItem = { ...item, annualValidationEntries: [{ year: 2026, dueDate: '2026-03-01', result: 'Pending', remarks: '' }] };
+  const pendingItem = { ...item, actualCompletionDate: `${new Date().getUTCFullYear()}-01-01`, annualValidationEntries: [{ year: 2026, dueDate: '2026-03-01', result: 'Pending', remarks: '' }] };
   await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [pendingItem], userRole: 'Head Engineer' })));
   const pendingSelect = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
   assert.ok(pendingSelect);
   assert.equal(pendingSelect.disabled, true);
   assert.equal(pendingSelect.className,select.className);
   assert.match(pendingSelect.textContent, /Awaiting Validation/);
+
+  // Back-entered historical projects remain assignable even with pending annual validation.
+  await reset();
+  const historicalItem = { ...pendingItem, actualCompletionDate: '2022-03-31' };
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [historicalItem], userRole: 'Head Engineer' })));
+  const historicalSelect = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
+  assert.equal(historicalSelect.disabled, false);
+  assert.match(historicalSelect.textContent, /Juan Dela Cruz/);
+  await act(async () => { historicalSelect.value = 'i1'; historicalSelect.dispatchEvent(new window.Event('change', { bubbles: true })); });
+  assert.deepEqual(assignments.at(-1), ['p', 'i1']);
 
   // task 13: both project lists filter by completion date instead of location
   for (const userRole of ['Head Engineer', 'Staff - Encoder']) {

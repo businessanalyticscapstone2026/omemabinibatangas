@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-16 — [mine] Allow inspector assignment for historical projects
+- **Type:** Modified
+- **Files:** `src/app/api/local-road/inspector-assignment/route.ts` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Projects completed in a prior calendar year can be assigned for historical data entry even when annual validation is pending or returned; current-year projects retain the validation requirement. Validation records are unchanged.
+- **Status:** ✅ Kept
+- **Original code affected:** Inspector assignment gating in the project table and API.
+
 ### 2026-11-14 — [mine] Standardize inspector dropdown width
 - **Type:** Modified
 - **Files:** `src/app/components/FilterControls.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `tests/project-form.test.cjs` (modified)

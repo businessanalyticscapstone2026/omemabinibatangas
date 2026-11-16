@@ -134,6 +134,24 @@ test('assignment is refused for other roles, unknown projects and non-inspector 
   assert.equal(state.writes.length, 0);
 });
 
+test('historical projects can be assigned without changing annual validation', async () => {
+  const entries = [{ year: 2023, result: 'Pending', dueDate: '2022-12-02', remarks: '' }, { year: 2024, result: 'Return for Revision', dueDate: '2023-12-02', remarks: 'Review' }];
+  const state = { roleDb: 'head_engineer', projects: [{ id: 'p', actualCompletionDate: '2022-12-31', annualValidationEntries: entries }], inspectors: ['i1'], writes: [], logs: [] };
+  assert.equal((await assignmentRoute(state).POST(request({ projectId: 'p', inspectorId: 'i1' }))).status, 200);
+  assert.deepEqual(state.writes, [{ projectId: 'p', inspectorId: 'i1' }]);
+  assert.deepEqual(state.projects[0].annualValidationEntries, entries);
+  state.projects[0].actualCompletionDate = `${new Date().getUTCFullYear()}-01-01`;
+  assert.equal((await assignmentRoute(state).POST(request({ projectId: 'p', inspectorId: 'i1' }))).status, 409);
+});
+
+test('historical assignment requires a valid actual completion date in a prior year', () => {
+  const { canAssignInspector } = load('src/lib/project-validation-workflow.ts');
+  const now = new Date('2026-07-01T00:00:00Z');
+  for (const date of ['2022-04-15', '2025-12-31']) assert.equal(canAssignInspector({ actualCompletionDate: date }, now), true);
+  for (const date of [undefined, '', '2022-02-30', '2026-01-01', '2027-01-01']) assert.equal(canAssignInspector({ actualCompletionDate: date }, now), false);
+  assert.equal(canAssignInspector({ validationResult: 'Validated' }, now), true);
+});
+
 test('the inspector list is readable by the Head Engineer only', async () => {
   const res = (status, body = {}) => ({ status, body });
   const state = { roleDb: 'head_engineer' };

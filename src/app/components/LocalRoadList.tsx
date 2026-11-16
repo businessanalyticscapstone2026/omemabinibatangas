@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PrintDocument, type PrintSection } from './PrintDocument';
 import { recordClientActivity } from '@/lib/activity-log-client';
-import { hasPassedValidation, isValidationLocked, latestValidation, validationTask } from '@/lib/project-validation-workflow';
+import { canAssignInspector, isValidationLocked, latestValidation, validationTask } from '@/lib/project-validation-workflow';
 import { formatSavedProjectCurrency } from '@/lib/project-form-validation';
 
 interface ProjectAttachment {
@@ -179,7 +179,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
     const searchValues = validationMode
       ? [item.projectName || item.name, task?.result || 'Pending', task?.year ? `Annual ${task.year}` : '', item.barangay || 'N/A', item.dateBuilt, item.condition, item.lastInspection || 'N/A']
       : showsAssignTable
-      ? [item.projectName || item.name, item.barangay || 'N/A', item.contractedAmount && `Php ${formatSavedProjectCurrency(item.contractedAmount)}`, date, inspectors.find(person => person.id === item.inspectorId)?.name || (hasPassedValidation(item) ? 'Not Assigned' : 'Awaiting Validation')]
+      ? [item.projectName || item.name, item.barangay || 'N/A', item.contractedAmount && `Php ${formatSavedProjectCurrency(item.contractedAmount)}`, date, inspectors.find(person => person.id === item.inspectorId)?.name || (canAssignInspector(item) ? 'Not Assigned' : 'Awaiting Validation')]
       : [item.projectName || item.name, item.barangay || 'Location not set', item.dateBuilt || 'Not set', item.lastInspection || 'Not recorded', latestValidation(item).result === 'Return for Revision' ? 'For Revision' : ''];
     const matchesSearch = searchValues.some(value => String(value ?? '').toLowerCase().includes(query));
     const matchesDate = !usesDateFilter || !filterCompletionDate || date === filterCompletionDate;
@@ -720,8 +720,8 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                             label={`Assign inspector for ${item.projectName || item.name}`}
                             triggerClassName="w-[192px] min-w-0"
                             value={item.inspectorId || '__unassigned__'}
-                            disabled={!onAssignInspector || assigningId === item.id || !hasPassedValidation(item)}
-                            title={hasPassedValidation(item) ? undefined : 'Assign an inspector once the project is validated'}
+                            disabled={!onAssignInspector || assigningId === item.id || !canAssignInspector(item)}
+                            title={canAssignInspector(item) ? undefined : 'Assign an inspector once the project is validated'}
                             onChange={async (value) => {
                               if (!onAssignInspector) return;
                               setAssigningId(item.id);
@@ -729,7 +729,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                               finally { setAssigningId(null); }
                             }}
                             options={[
-                              {value: '__unassigned__', label: hasPassedValidation(item) ? 'Not Assigned' : 'Awaiting Validation'},
+                              {value: '__unassigned__', label: canAssignInspector(item) ? 'Not Assigned' : 'Awaiting Validation'},
                               ...inspectors.map(inspector => ({value: inspector.id, label: inspector.name})),
                             ]}
                           />
