@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-16 — [mine] Use validated annual year for inspection cards
+- **Type:** Modified
+- **Files:** `src/app/api/inspections/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `src/lib/inspection-selection.ts` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/inspection-selection.test.cjs` (modified), `tests/role-crud.test.cjs` (modified)
+- **What & why:** Remove the manual follow-up year selector and show the earliest validated annual follow-up awaiting inspection results, preserving completed records and enforcing the same validation on the server.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-16 — [mine] Support historical inspection and maintenance recording
 - **Type:** Modified
 - **Files:** `src/app/api/inspections/route.ts` (modified), `src/app/api/maintenance/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `src/lib/inspection-selection.ts` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/inspection-selection.test.cjs` (modified), `tests/role-crud.test.cjs` (modified)

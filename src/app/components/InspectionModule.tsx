@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PrintDocument, type PrintSection } from './PrintDocument';
 import { recordClientActivity } from '@/lib/activity-log-client';
-import { latestByProject, isPendingInspection, findingsSummary } from '@/lib/inspection-selection';
+import { inspectionCardsByValidation, isPendingInspection, findingsSummary } from '@/lib/inspection-selection';
 import { hasFourDigitYear, anniversaryMinusDays, INSPECTION_DAYS_BEFORE, formatSavedProjectCurrency } from '@/lib/project-form-validation';
 import { attachmentError } from '@/lib/attachment-validation';
 
@@ -355,7 +355,7 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
     ? datedInspections.filter(inspection => !isPendingInspectionRecord(inspection) && inspection.date?.slice(0, 4) === overviewPrintYear)
     : datedInspections;
   const originalOrder = new Map(inspections.slice().reverse().map((inspection, index) => [inspection.id, index]));
-  const filteredInspections = latestByProject(yearInspections)
+  const filteredInspections = inspectionCardsByValidation(yearInspections, localRoadList)
     .slice()
     .reverse()
     .map((inspection) => ({
@@ -876,20 +876,6 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                 <section ref={inspectionSectionRef} className="scroll-mt-4 pt-5">
                 <div className="border-b pb-4">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Inspector Information</h3>
-                  {editingInspection && editingInspection.annualFollowUpYear && (() => {
-                    const years = inspections.filter(item => item.localRoadId === editingInspection.localRoadId && item.annualFollowUpYear && (item.id === editingInspection.id || isPendingInspectionRecord(item)));
-                    return years.length > 1 ? <div className="mb-4">
-                      <label htmlFor="inspection-follow-up-year" className="block mb-1 text-sm font-medium">Annual follow-up year</label>
-                      <select id="inspection-follow-up-year" className="w-full rounded-md border border-gray-300 bg-white p-2" value={editingInspection.id} onChange={event => {
-                        const selected = years.find(item => item.id === event.target.value);
-                        if (!selected) return;
-                        startEditingInspection(selected);
-                      }}>
-                        {years.slice().sort((a, b) => (a.annualFollowUpYear || 0) - (b.annualFollowUpYear || 0)).map(item => <option key={item.id} value={item.id}>{item.annualFollowUpYear}</option>)}
-                      </select>
-                      <p className="mt-1 text-xs text-slate-500">Choose the year before entering details. Switching years resets unsaved changes.</p>
-                    </div> : null;
-                  })()}
                   <div className="rounded-lg border border-gray-300 overflow-hidden bg-white">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
                       <div className="border-r border-gray-300">

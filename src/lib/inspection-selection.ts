@@ -32,6 +32,27 @@ export function latestByProject<T extends InspectionSummary>(inspections: T[]): 
   return Array.from(selected.values());
 }
 
+/** Prefer the earliest validated follow-up awaiting results; retain completed history. */
+export function inspectionCardsByValidation<T extends InspectionSummary>(inspections: T[], roads: Array<{ id: string; annualValidationEntries?: Array<{ year: number; result: string }> }>): T[] {
+  const grouped = new Map<string, T[]>();
+  for (const inspection of inspections) grouped.set(inspection.localRoadId, [...(grouped.get(inspection.localRoadId) || []), inspection]);
+  const selected: T[] = [];
+  for (const [roadId, records] of Array.from(grouped)) {
+    const road = roads.find(item => item.id === roadId);
+    // Legacy callers without validation metadata retain their existing display.
+    if (!road || !Array.isArray(road.annualValidationEntries)) {
+      selected.push(...latestByProject(records));
+      continue;
+    }
+    const validated = new Set(road.annualValidationEntries.filter(entry => entry.result === 'Validated').map(entry => entry.year));
+    const pending = records.filter(item => isPendingInspection(item) && item.annualFollowUpYear && validated.has(item.annualFollowUpYear))
+      .sort((a, b) => (a.annualFollowUpYear || 0) - (b.annualFollowUpYear || 0));
+    if (pending.length) selected.push(pending[0]);
+    else selected.push(...latestByProject(records.filter(item => !isPendingInspection(item))));
+  }
+  return selected;
+}
+
 export function maintenanceEligible(inspection: InspectionSummary): boolean {
   if (isPendingInspection(inspection)) return false;
   const ratings = Object.values(inspection.conditionRatings || {});

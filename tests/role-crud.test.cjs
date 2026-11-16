@@ -430,3 +430,21 @@ test('historical follow-up and linked maintenance dates use their own year and i
     assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:'2024-07-07'}))).status,200);
   } finally {Object.assign(data,old);}
 });
+
+test('recording an annual follow-up requires validation for that same year', async () => {
+  const old={listRoads:data.listRoads,listInspections:data.listInspections,listMaintenance:data.listMaintenance,listArchivedMaintenance:data.listArchivedMaintenance,saveInspection:data.saveInspection,saveRoad:data.saveRoad};
+  try {
+    role='inspector';
+    const road={id:'p',actualCompletionDate:'2023-08-04',inspectorId:'test',annualValidationEntries:[{year:2024,result:'Validated'},{year:2026,result:'Pending'}]};
+    data.listRoads=async()=>[road];
+    data.listInspections=async()=>[{id:'i',localRoadId:'p',date:'2024-07-06',annualFollowUpYear:2024,isScheduledAnnualFollowUp:true}];
+    data.listMaintenance=async()=>[];data.listArchivedMaintenance=async()=>[];
+    data.saveInspection=async(_db,payload)=>payload; data.saveRoad=async(_db,item)=>item;
+    const labels=loadTs('src/lib/inspection-selection.ts',{}).assessmentComponents;
+    const conditionRatings=Object.fromEntries(labels.map(label=>[label,label==='Concrete'?'Good':'N/A']));
+    const body={id:'i',localRoadId:'p',date:'2024-07-06',inspectionType:'Monitoring and Maintenance Inspection',conditionRatings,conditionRemarks:{},conditionAttachments:{}};
+    assert.equal((await routes.inspections.PUT(request(body))).status,200);
+    road.annualValidationEntries[0].result='Return for Revision';
+    assert.equal((await routes.inspections.PUT(request(body))).status,409);
+  } finally {Object.assign(data,old);}
+});
