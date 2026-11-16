@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-16 — [mine] Open inspector menu immediately with verified options
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/components/FilterControls.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/lib/supabase-data.ts` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Open the inspector menu without waiting for the network while hiding cached names until fresh eligible accounts arrive; only active inspectors can be offered or assigned.
+- **Status:** ✅ Kept
+- **Original code affected:** Project assignment selector and inspector eligibility checks.
+
 ### 2026-11-16 — [mine] Prevent stale inspector options and loading flicker
 - **Type:** Modified
 - **Files:** `src/app/App.tsx` (modified), `src/app/api/local-road/inspectors/route.ts` (modified), `src/app/components/FilterControls.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `tests/project-form.test.cjs` (modified)

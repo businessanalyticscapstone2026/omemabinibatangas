@@ -80,41 +80,45 @@ interface LocalRoadListProps {
   // @mine — task 11: the Head Engineer assigns one inspector per project from the list.
   inspectors?: Array<{ id: string; name: string }>;
   inspectorListState?: 'loading' | 'ready' | 'error';
-  onRefreshInspectors?: () => Promise<boolean>;
+  onRefreshInspectors?: () => Promise<Array<{ id: string; name: string }> | null>;
   onAssignInspector?: (projectId: string, inspectorId: string) => Promise<unknown> | unknown;
 }
 
-/** Keep the menu closed until a fresh inspector list has been loaded. */
+/** Open immediately, but never show cached inspector choices before revalidation. */
 function InspectorAssignmentSelect({ item, inspectors, listState, refresh, onAssign, assigning }: {
   item: LocalRoad; inspectors: Array<{ id: string; name: string }>;
-  listState: 'loading' | 'ready' | 'error'; refresh?: () => Promise<boolean>;
+  listState: 'loading' | 'ready' | 'error'; refresh?: () => Promise<Array<{ id: string; name: string }> | null>;
   onAssign?: (projectId: string, inspectorId: string) => Promise<unknown> | unknown; assigning: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [menuInspectors, setMenuInspectors] = useState<Array<{ id: string; name: string }>>([]);
   const request = useRef(0);
-  const pending = useRef(false);
   useEffect(() => () => { request.current += 1; }, []);
   const handleOpenChange = async (nextOpen: boolean) => {
-    if (!nextOpen) { request.current += 1; pending.current = false; setOpen(false); return; }
-    if (pending.current) return;
     const current = ++request.current;
-    pending.current = true;
+    setOpen(nextOpen);
+    setMenuInspectors([]);
     setLoadError(false);
-    let refreshed = false;
-    try { refreshed = refresh ? await refresh() : true; } catch { refreshed = false; }
+    if (!nextOpen) return;
+    let refreshed: Array<{ id: string; name: string }> | null = null;
+    try { refreshed = refresh ? await refresh() : inspectors; } catch { refreshed = null; }
     if (request.current !== current) return;
-    pending.current = false;
-    if (refreshed) setOpen(true);
+    if (refreshed) setMenuInspectors(refreshed);
     else setLoadError(true);
   };
-  const available = !item.inspectorId || inspectors.some(inspector => inspector.id === item.inspectorId);
+  const assignedInspector = inspectors.find(inspector => inspector.id === item.inspectorId);
+  const available = !item.inspectorId || Boolean(assignedInspector);
+  const displayValue = item.inspectorId
+    ? assignedInspector?.name ?? (listState === 'ready' ? 'Inspector unavailable' : 'Inspector')
+    : (canAssignInspector(item) ? 'Not Assigned' : 'Awaiting Validation');
   return <>
     <StyledFilterSelect
       label={`Assign inspector for ${item.projectName || item.name}`}
       triggerClassName="w-[192px] min-w-0"
       value={item.inspectorId ? (available ? item.inspectorId : '') : '__unassigned__'}
       placeholder={listState === 'ready' ? 'Inspector unavailable' : 'Inspector'}
+      displayValue={displayValue}
       open={open}
       onOpenChange={handleOpenChange}
       disabled={!onAssign || assigning || !canAssignInspector(item)}
@@ -122,7 +126,7 @@ function InspectorAssignmentSelect({ item, inspectors, listState, refresh, onAss
       onChange={value => { if (onAssign) void onAssign(item.id, value === '__unassigned__' ? '' : value); }}
       options={[
         { value: '__unassigned__', label: canAssignInspector(item) ? 'Not Assigned' : 'Awaiting Validation' },
-        ...inspectors.map(inspector => ({ value: inspector.id, label: inspector.name })),
+        ...(open ? menuInspectors : inspectors).map(inspector => ({ value: inspector.id, label: inspector.name })),
       ]}
     />
     {loadError && <p role="alert" className="mt-1 text-xs text-red-700">Unable to load inspectors. Open the list to retry.</p>}

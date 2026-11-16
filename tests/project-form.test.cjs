@@ -764,17 +764,17 @@ test('task 11: the Head Engineer project table carries the five columns and an i
   assert.equal(assignedSelect.value,'i1');assert.equal(assignedSelect.className,select.className);
 
   let refreshes = 0;
-  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [{ ...item, inspectorId: 'i1' }], userRole: 'Head Engineer', inspectors: [], onRefreshInspectors: async () => { refreshes += 1; return true; } })));
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [{ ...item, inspectorId: 'i1' }], userRole: 'Head Engineer', inspectors: [], onRefreshInspectors: async () => { refreshes += 1; return []; } })));
   const unavailableSelect = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
   assert.doesNotMatch(unavailableSelect.textContent, /Juan Dela Cruz/);
   assert.match(container.textContent, /Assigned inspector unavailable/);
   await act(async () => unavailableSelect.click());
   assert.equal(refreshes, 1);
-  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [item], userRole: 'Head Engineer', inspectors: [], inspectorListState: 'error', onRefreshInspectors: async () => false })));
+  await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [item], userRole: 'Head Engineer', inspectors: [], inspectorListState: 'error', onRefreshInspectors: async () => null })));
   await act(async () => { unavailableSelect.click(); });
   assert.match(container.textContent, /Unable to load inspectors/);
 
-  // A fresh list must arrive before the menu opens; the page never flashes a loading label.
+  // The menu opens immediately but contains no cached inspector names while fetching.
   await reset();
   let completeRefresh;
   const pendingRefresh = new Promise(resolve => { completeRefresh = resolve; });
@@ -782,11 +782,12 @@ test('task 11: the Head Engineer project table carries the five columns and an i
   await act(async () => root.render(React.createElement(LocalRoadList, { ...staleProps, userRole: 'Head Engineer' })));
   const guarded = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
   await act(async () => { guarded.click(); });
-  assert.equal(guarded.dataset.open, 'false');
+  assert.equal(guarded.dataset.open, 'true');
+  assert.doesNotMatch(guarded.textContent, /Deleted Inspector/);
   assert.doesNotMatch(container.textContent, /Loading inspectors/i);
   await act(async () => {
     root.render(React.createElement(LocalRoadList, { ...staleProps, inspectors: [{ id: 'new', name: 'Registered Inspector' }], userRole: 'Head Engineer' }));
-    completeRefresh(true);
+    completeRefresh([{ id: 'new', name: 'Registered Inspector' }]);
     await pendingRefresh;
   });
   assert.equal(guarded.dataset.open, 'true');

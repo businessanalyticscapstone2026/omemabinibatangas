@@ -223,7 +223,7 @@ export default function App() {
   const inspectorRequest = useRef(0);
   const [inspectorListState, setInspectorListState] = useState<'loading' | 'ready' | 'error'>('loading');
   const refreshInspectors = useCallback(async () => {
-    if (!isLoggedIn || userRole !== 'Head Engineer') return false;
+    if (!isLoggedIn || userRole !== 'Head Engineer') return null;
     const request = ++inspectorRequest.current;
     try {
       const response = await fetch('/api/local-road/inspectors', { cache: 'no-store' });
@@ -233,13 +233,13 @@ export default function App() {
       if (inspectorRequest.current === request) {
         setInspectors(payload.data);
         setInspectorListState('ready');
-        return true;
+        return payload.data as Array<{ id: string; name: string }>;
       }
-      return false;
+      return null;
     } catch (error) {
       console.error('Failed to load inspectors.', error);
       if (inspectorRequest.current === request) setInspectorListState('error');
-      return false;
+      return null;
     }
   }, [isLoggedIn, userRole]);
 

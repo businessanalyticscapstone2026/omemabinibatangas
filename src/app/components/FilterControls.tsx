@@ -4,9 +4,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 
-export function StyledFilterSelect({ label, value, onChange, options, compact = false, disabled = false, title, triggerClassName, onOpenChange, placeholder, open }: { label: string; value: string; onChange: (value: string) => void; compact?: boolean; disabled?: boolean; title?: string; triggerClassName?: string; onOpenChange?: (open: boolean) => void; open?: boolean; placeholder?: string; options: { value: string; label: string }[] }) {
+export function StyledFilterSelect({ label, value, onChange, options, compact = false, disabled = false, title, triggerClassName, onOpenChange, placeholder, open, displayValue }: { label: string; value: string; onChange: (value: string) => void; compact?: boolean; disabled?: boolean; title?: string; triggerClassName?: string; onOpenChange?: (open: boolean) => void; open?: boolean; placeholder?: string; displayValue?: string; options: { value: string; label: string }[] }) {
   return <Select value={value} onValueChange={onChange} onOpenChange={onOpenChange} open={open} disabled={disabled}>
-    <SelectTrigger aria-label={label} title={title} className={triggerClassName ?? (compact ? "h-10 w-[120px] min-w-0 px-3" : "w-auto min-w-36")}><SelectValue className="min-w-0 truncate" placeholder={placeholder} /></SelectTrigger>
+    <SelectTrigger aria-label={label} title={title} className={triggerClassName ?? (compact ? "h-10 w-[120px] min-w-0 px-3" : "w-auto min-w-36")}><SelectValue className="min-w-0 truncate" placeholder={placeholder}>{displayValue}</SelectValue></SelectTrigger>
     <SelectContent>{options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
   </Select>;
 }
