@@ -391,3 +391,21 @@ test('inspection road name is below the network ID in edit, view and print', asy
   assert.ok(editRoad.querySelector('.space-y-3'));assert.match(editRoad.textContent,/Road Network ID No\.Road Name/);assert.equal(editRoad.querySelector('.space-y-3').querySelectorAll('textarea[readonly]').length,2);
   act(()=>root.unmount());container.remove();
 });
+
+test('the inspector can select an earlier pending follow-up and use its own anniversary minimum', () => {
+  const earlier = { ...pendingInspection, id: 'old', annualFollowUpYear: 2024, date: '2024-07-06', actualCompletionDate: '2023-08-04' };
+  const later = { ...pendingInspection, id: 'new', annualFollowUpYear: 2026, date: '2026-07-06', actualCompletionDate: '2023-08-04' };
+  const { container, root } = renderModule([earlier, later]);
+  openPendingForm(container);
+  const year = container.querySelector('#inspection-follow-up-year');
+  assert.ok(year);
+  assert.equal(year.value, 'new');
+  const date = [...container.querySelectorAll('input[type=date]')].find(input => input.required);
+  assert.equal(date.min, '2026-07-06');
+  act(() => { year.value = 'old'; year.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
+  const earlierDate = [...container.querySelectorAll('input[type=date]')].find(input => input.required);
+  assert.equal(earlierDate.min, '2024-07-06');
+  assert.equal(earlierDate.value, '');
+  act(() => root.unmount());
+  container.remove();
+});

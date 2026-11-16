@@ -402,3 +402,31 @@ test('inspector project GET never includes another inspector project, including 
   assert.deepEqual(result.body.archived.map(row => row.id), ['mine']);
   role = null;
 });
+
+test('historical follow-up and linked maintenance dates use their own year and inspection', async () => {
+  const old={listRoads:data.listRoads,listInspections:data.listInspections,listArchivedInspections:data.listArchivedInspections,listMaintenance:data.listMaintenance,listArchivedMaintenance:data.listArchivedMaintenance,saveInspection:data.saveInspection,saveRoad:data.saveRoad,saveMaintenance:data.saveMaintenance};
+  try {
+    role='inspector'; data.listRoads=async()=>[{id:'p',actualCompletionDate:'2023-08-04',inspectorId:'test'}];
+    data.listInspections=async()=>[{id:'old',localRoadId:'p',date:'2024-07-06',annualFollowUpYear:2024,isScheduledAnnualFollowUp:true}];
+    data.listMaintenance=async()=>[]; data.listArchivedMaintenance=async()=>[];
+    data.saveInspection=async(_db,payload)=>payload; data.saveRoad=async(_db,road)=>road;
+    const labels=loadTs('src/lib/inspection-selection.ts',{}).assessmentComponents;
+    const conditionRatings=Object.fromEntries(labels.map(label=>[label,label==='Concrete'?'Good':'N/A']));
+    const body={id:'old',localRoadId:'p',inspectionType:'Monitoring and Maintenance Inspection',conditionRatings,conditionRemarks:{},conditionAttachments:{}};
+    assert.equal((await routes.inspections.PUT(request({...body,date:'2024-07-05'}))).status,400);
+    const saved=await routes.inspections.PUT(request({...body,date:'2024-07-06'}));
+    assert.equal(saved.status,200); assert.equal(saved.body.data.annualFollowUpYear,2024);
+    role='encoder';
+    const early={id:'early',localRoadId:'p',date:'2024-07-06',annualFollowUpYear:2024,conditionRatings:{Concrete:'Fair'}};
+    const later={id:'later',localRoadId:'p',date:'2026-07-06',annualFollowUpYear:2026,conditionRatings:{Concrete:'Fair'}};
+    data.listInspections=async()=>[early,later]; data.listArchivedInspections=async()=>[];
+    data.listMaintenance=async()=>[{id:'existing',inspectionId:'later'}];
+    data.saveMaintenance=async(_db,payload)=>({...payload,id:'m'});
+    const maintenance={localRoadId:'p',inspectionId:'early',type:'Corrective Maintenance',dateStarted:'2024-07-07',scheduledDate:'2024-07-07'};
+    assert.equal((await routes.maintenance.POST(request({...maintenance,dateStarted:'2024-07-06'}))).status,400);
+    assert.equal((await routes.maintenance.POST(request(maintenance))).status,200);
+    data.listMaintenance=async()=>[{id:'m',localRoadId:'p',inspectionId:'early',status:'In Progress',dateStarted:'2024-07-07',scheduledDate:'2024-07-07',type:'Repair',description:'Repair',remarks:'Done'}];
+    assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:'2024-07-06'}))).status,400);
+    assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:'2024-07-07'}))).status,200);
+  } finally {Object.assign(data,old);}
+});

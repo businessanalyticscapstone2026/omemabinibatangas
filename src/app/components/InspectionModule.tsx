@@ -286,7 +286,7 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
   useEffect(() => {
     if (!showForm) return;
     formScrollRef.current?.scrollTo({ top: 0 });
-  }, [showForm, editingInspection]);
+  }, [showForm]);
 
   const moveToFormTab = (index: number) => {
     const scrollContainer = formScrollRef.current;
@@ -876,6 +876,20 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                 <section ref={inspectionSectionRef} className="scroll-mt-4 pt-5">
                 <div className="border-b pb-4">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Inspector Information</h3>
+                  {editingInspection && editingInspection.annualFollowUpYear && (() => {
+                    const years = inspections.filter(item => item.localRoadId === editingInspection.localRoadId && item.annualFollowUpYear && (item.id === editingInspection.id || isPendingInspectionRecord(item)));
+                    return years.length > 1 ? <div className="mb-4">
+                      <label htmlFor="inspection-follow-up-year" className="block mb-1 text-sm font-medium">Annual follow-up year</label>
+                      <select id="inspection-follow-up-year" className="w-full rounded-md border border-gray-300 bg-white p-2" value={editingInspection.id} onChange={event => {
+                        const selected = years.find(item => item.id === event.target.value);
+                        if (!selected) return;
+                        startEditingInspection(selected);
+                      }}>
+                        {years.slice().sort((a, b) => (a.annualFollowUpYear || 0) - (b.annualFollowUpYear || 0)).map(item => <option key={item.id} value={item.id}>{item.annualFollowUpYear}</option>)}
+                      </select>
+                      <p className="mt-1 text-xs text-slate-500">Choose the year before entering details. Switching years resets unsaved changes.</p>
+                    </div> : null;
+                  })()}
                   <div className="rounded-lg border border-gray-300 overflow-hidden bg-white">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
                       <div className="border-r border-gray-300">
@@ -887,6 +901,7 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                             max="9999-12-31"
                             onInvalid={e => e.currentTarget.setCustomValidity(e.currentTarget.validity.valueMissing ? 'Please fill out this field.' : 'Please fill out valid date.')}
                             onInput={e => e.currentTarget.setCustomValidity('')}
+                            key={editingInspection?.id || 'new-inspection'}
                             defaultValue={formData.date}
                             onChange={(e) => { if (e.target.value) setFormData(prev => ({ ...prev, date: e.target.value })); }}
                             onBlur={(e) => { if (!e.target.value) setFormData(prev => ({ ...prev, date: '' })); }}

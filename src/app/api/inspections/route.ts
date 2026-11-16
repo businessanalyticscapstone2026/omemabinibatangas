@@ -20,7 +20,9 @@ function earliestInspectionDate(road: StoredRecord, payload: StoredRecord, exist
   const completed = String(road.actualCompletionDate || '');
   if (!hasFourDigitYear(completed)) return null;
   const requested = Number(existing?.annualFollowUpYear || payload.annualFollowUpYear);
-  const year = Number.isInteger(requested) && requested > 0 ? requested : Number(completed.slice(0, 4)) + 1;
+  const firstYear = Number(completed.slice(0, 4)) + 1;
+  const year = Number.isInteger(requested) && requested > 0 ? requested : firstYear;
+  if (year < firstYear) return null;
   return anniversaryMinusDays(completed, year, INSPECTION_DAYS_BEFORE);
 }
 
@@ -173,7 +175,7 @@ export async function PUT(request: Request) {
     if (existing.date !== payload.date) {
       const minMaintenance = addCalendarDays(payload.date as string, 1);
       const [active, archived] = await Promise.all([listMaintenance(auth.admin), listArchivedMaintenance(auth.admin)]);
-      if (!minMaintenance || [...active, ...archived].some(item => item.inspectionId === existing.id && [item.dateStarted, item.scheduledDate].some(date => typeof date === 'string' && date && date < minMaintenance))) {
+      if (!minMaintenance || [...active, ...archived].some(item => item.inspectionId === existing.id && [item.dateStarted, item.scheduledDate, item.completedDate].some(date => typeof date === 'string' && date && date < minMaintenance))) {
         return NextResponse.json({ message: 'This inspection date conflicts with linked maintenance dates.' }, { status: 409 });
       }
     }

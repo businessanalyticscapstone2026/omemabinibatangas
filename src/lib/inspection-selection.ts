@@ -40,20 +40,19 @@ export function maintenanceEligible(inspection: InspectionSummary): boolean {
   return score > 0 && score < 8;
 }
 
-/** An inspection can only be scheduled once; subsequent schedules require a newer annual follow-up. */
+/** A follow-up may be scheduled once, including when older years are entered later. */
 export function eligibleMaintenanceInspections<T extends InspectionSummary>(inspections: T[], scheduledIds: string[], archivedInspections: InspectionSummary[] = []): T[] {
   const scheduled = new Set(scheduledIds);
-  const previousByRoad = new Map<string, number>();
+  const scheduledYears = new Set<string>();
   for (const inspection of [...inspections, ...archivedInspections]) {
     if (!scheduled.has(inspection.id)) continue;
     const year = inspection.annualFollowUpYear || Number(inspection.date?.slice(0, 4)) || 0;
-    previousByRoad.set(inspection.localRoadId, Math.max(previousByRoad.get(inspection.localRoadId) || 0, year));
+    if (year) scheduledYears.add(`${inspection.localRoadId}:${year}`);
   }
-  return latestByProject(inspections.filter(inspection => !isPendingInspection(inspection))).filter(inspection => {
-    if (!maintenanceEligible(inspection) || scheduled.has(inspection.id)) return false;
-    const previousYear = previousByRoad.get(inspection.localRoadId);
-    return previousYear === undefined || (!!inspection.annualFollowUpYear && inspection.annualFollowUpYear > previousYear);
-  });
+  return inspections.filter(inspection => {
+    const year = inspection.annualFollowUpYear || Number(inspection.date?.slice(0, 4)) || 0;
+    return maintenanceEligible(inspection) && !scheduled.has(inspection.id) && (!year || !scheduledYears.has(`${inspection.localRoadId}:${year}`));
+  }).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
 }
 
 export const assessmentComponents = ['Concrete', 'Asphalt', 'Gravel', 'Earth', 'Shoulder', 'Side Drain', 'Sidewalk', 'Drainage', 'Solar Lights', 'Slope Protection', 'Retaining Wall'];

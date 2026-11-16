@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-16 — [mine] Support historical inspection and maintenance recording
+- **Type:** Modified
+- **Files:** `src/app/api/inspections/route.ts` (modified), `src/app/api/maintenance/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `src/lib/inspection-selection.ts` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/inspection-selection.test.cjs` (modified), `tests/role-crud.test.cjs` (modified)
+- **What & why:** Allow users to select a prior pending follow-up and its linked inspection for back-entered maintenance while enforcing anniversary and next-day minimums, and preserve the entered completion date.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-16 — [mine] Show preloaded inspectors immediately
 - **Type:** Modified
 - **Files:** `src/app/components/LocalRoadList.tsx` (modified), `tests/project-form.test.cjs` (modified)

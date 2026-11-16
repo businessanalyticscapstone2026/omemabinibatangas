@@ -104,3 +104,13 @@ test('annual offsets are exact days before the anniversary, every year, clamping
   assert.equal(anniversaryMinusDays('2026-11-11', 1990, 30), null);
   assert.equal(anniversaryMinusDays('', 2027, 30), null);
 });
+
+test('historical inspections can be scheduled after newer years without duplicating a year', () => {
+  const {eligibleMaintenanceInspections} = load('src/lib/inspection-selection.ts');
+  const older = {id:'old',localRoadId:'p',date:'2024-06-01',annualFollowUpYear:2024,conditionRatings:{A:'Fair'}};
+  const newer = {...older,id:'new',date:'2026-06-01',annualFollowUpYear:2026};
+  const duplicate = {...older,id:'duplicate',date:'2026-06-02',annualFollowUpYear:2026};
+  assert.deepEqual(eligibleMaintenanceInspections([older,newer],['new']).map(i=>i.id),['old']);
+  assert.deepEqual(eligibleMaintenanceInspections([older,duplicate],['new'],[newer]).map(i=>i.id),['old']);
+  assert.deepEqual(eligibleMaintenanceInspections([older,newer],[]).map(i=>i.id),['new','old']);
+});
