@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-16 — [mine] Bypass server cache for admin account reads
+- **Type:** Modified
+- **Files:** `src/lib/supabase.ts` (modified), `tests/inspector-assignment.test.cjs` (modified)
+- **What & why:** Ensure inspector eligibility and assignment checks read current account data rather than cached Supabase responses.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-16 — [mine] Open inspector menu immediately with verified options
 - **Type:** Modified
 - **Files:** `src/app/App.tsx` (modified), `src/app/components/FilterControls.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/lib/supabase-data.ts` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/project-form.test.cjs` (modified)

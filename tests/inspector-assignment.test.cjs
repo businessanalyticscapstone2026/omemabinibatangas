@@ -45,6 +45,28 @@ function profileDb(rows) {
   };
 }
 
+test('admin database requests explicitly bypass the server fetch cache', async () => {
+  let options;
+  // Module reads configuration on import; this test does not connect to Supabase.
+  const previousKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-only';
+  const configured = load('src/lib/supabase.ts', {
+    '@supabase/supabase-js': { createClient: (_url, _key, config) => { options = config; return {}; } },
+  });
+  if (previousKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  else process.env.SUPABASE_SERVICE_ROLE_KEY = previousKey;
+  configured.createAdminClient();
+  const previousFetch = global.fetch;
+  let seen;
+  global.fetch = async (input, init) => { seen = { input, init }; return {}; };
+  try {
+    await options.global.fetch('https://example.test/profiles', { method: 'GET', headers: { test: 'value' }, cache: 'force-cache' });
+    assert.equal(seen.init.cache, 'no-store');
+    assert.equal(seen.init.method, 'GET');
+    assert.deepEqual(seen.init.headers, { test: 'value' });
+  } finally { global.fetch = previousFetch; }
+});
+
 test('only active Inspector accounts are offered for assignment', async () => {
   const data = load('src/lib/supabase-data.ts', baseMocks);
   const rows = [
