@@ -395,7 +395,7 @@ export default function App() {
     setShowLocalRoadForm(false);
     setEditingLocalRoad(null);
     setActiveTab(tab);
-    if (tab === 'validation-management' || tab === 'project-management') window.dispatchEvent(new Event('local-road-records-changed'));
+    if (tab === 'validation-management' || tab === 'project-management' || tab === 'ai') window.dispatchEvent(new Event('local-road-records-changed'));
   };
 
   const handleAiRecommendationsChange = (recommendations: PredictionResult[]) => {

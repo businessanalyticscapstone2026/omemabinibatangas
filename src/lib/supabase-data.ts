@@ -1298,6 +1298,7 @@ export async function getLatestAiPredictions(admin: SupabaseClient): Promise<Sto
       localRoadName: str(factors.name) || road.road_name || project.project_name || '',
       type: str(factors.type) || project.project_categories?.name || '',
       lastInspection: str(factors.lastInspection) || str(road.last_inspection_date) || 'N/A',
+      ...(factors.inspectionFingerprint ? { inspectionFingerprint: str(factors.inspectionFingerprint) } : {}),
       condition: str(factors.condition) || cap(road.current_condition) || 'Good',
       riskLevel: RISK_FROM_DB[row.risk_level] ?? 'Low',
       priorityScore: Number(row.priority_score ?? 0),

@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-17 — [mine] Show inspected projects in AI recommendations automatically
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/api/ai-priority/route.ts` (modified), `src/app/components/AIPredictionModule.tsx` (modified), `src/lib/supabase-data.ts` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Build the recommendation table from eligible latest inspections and reserve generation for AI text updates; identify stale results after inspection changes.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-17 — [mine] Protect first validation and order annual history
 - **Type:** Modified
 - **Files:** `src/app/api/local-road/annual-validation/route.ts` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `tests/validation-workflow.test.cjs` (modified)
