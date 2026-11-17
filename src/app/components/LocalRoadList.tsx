@@ -76,6 +76,7 @@ interface LocalRoadListProps {
   validatorName?: string;
   currentUser: string;
   onSaveValidation?: (id: string, result: 'Validated' | 'Return for Revision', remarks: string, annualYear?: number) => Promise<boolean>;
+  onDeleteValidation?: (id: string, year: number) => Promise<boolean>;
   userRole?: string;
   // @mine — task 11: the Head Engineer assigns one inspector per project from the list.
   inspectors?: Array<{ id: string; name: string }>;
@@ -135,7 +136,7 @@ function InspectorAssignmentSelect({ item, inspectors, listState, refresh, onAss
   </>;
 }
 
-export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = false, validatorName = '', currentUser, onSaveValidation, userRole = '', inspectors = [], inspectorListState = 'ready', onRefreshInspectors, onAssignInspector }: LocalRoadListProps) {
+export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = false, validatorName = '', currentUser, onSaveValidation, onDeleteValidation, userRole = '', inspectors = [], inspectorListState = 'ready', onRefreshInspectors, onAssignInspector }: LocalRoadListProps) {
   // @mine — Head Engineer is the actual session label for the Admin role.
   const isAdminReadDeleteOnly = ['Admin', 'Head Engineer'].includes(userRole) && !validationMode;
   const [searchTerm, setSearchTerm] = useState('');
@@ -149,6 +150,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
   const [selectedSnapshot, setSelectedItem] = useState<LocalRoad | null>(null);
   const selectedItem = selectedSnapshot ? data.find(item => item.id === selectedSnapshot.id) ?? selectedSnapshot : null;
   const [pendingDelete, setPendingDelete] = useState<LocalRoad | null>(null);
+  const [pendingValidationDelete, setPendingValidationDelete] = useState<{ item: LocalRoad; year: number } | null>(null);
   const [selectedAttachment, setSelectedAttachment] = useState<ProjectAttachment | null>(null);
   const [validationResult, setValidationResult] = useState<'Validated' | 'Return for Revision' | ''>('');
   const [validationRemarks, setValidationRemarks] = useState('');
@@ -228,16 +230,15 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
   const filteredData = data.filter(item => {
     const query = searchTerm.trim().toLowerCase();
     const date = showsAssignTable ? (item.actualCompletionDate || item.completionDate || '') : (item.dateBuilt || '');
-    const task = validationTask(item);
     const searchValues = validationMode
-      ? [item.projectName || item.name, task?.result || 'Pending', task?.year ? `Annual ${task.year}` : '', item.barangay || 'N/A', item.dateBuilt, item.condition, item.lastInspection || 'N/A']
+      ? [item.projectName || item.name, ...(item.annualValidationEntries || []).flatMap(entry => [entry.result, `Annual ${entry.year}`]), item.barangay || 'N/A', item.dateBuilt, item.condition, item.lastInspection || 'N/A']
       : showsAssignTable
       ? [item.projectName || item.name, item.barangay || 'N/A', item.contractedAmount && `Php ${formatSavedProjectCurrency(item.contractedAmount)}`, date, inspectors.find(person => person.id === item.inspectorId)?.name || (canAssignInspector(item) ? 'Not Assigned' : 'Awaiting Validation')]
       : [item.projectName || item.name, item.barangay || 'Location not set', item.dateBuilt || 'Not set', item.lastInspection || 'Not recorded', latestValidation(item).result === 'Return for Revision' ? 'For Revision' : ''];
     const matchesSearch = searchValues.some(value => String(value ?? '').toLowerCase().includes(query));
     const matchesDate = !usesDateFilter || !filterCompletionDate || date === filterCompletionDate;
     const matchesLocation = usesDateFilter || filterLocation === 'All' || (item.barangay || item.location) === filterLocation;
-    const isEligibleForValidation = !validationMode || validationTask(item) !== null;
+    const isEligibleForValidation = !validationMode || (item.annualValidationEntries?.length ?? 0) > 0;
     return matchesSearch && matchesLocation && matchesDate && isEligibleForValidation;
   });
 
@@ -481,7 +482,12 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                 </button>
               </div>
             )}
-            {validationMode && (
+            {validationMode && selectedValidationYear != null && <div className="border-t border-slate-200 pt-4 text-sm text-slate-700">
+              <p className="font-semibold">Annual Follow-up {selectedValidationYear}</p>
+              <p>{selectedItem.annualValidationEntries?.find(entry => entry.year === selectedValidationYear)?.result || 'Pending'}</p>
+              <p className="whitespace-pre-wrap">{selectedItem.annualValidationEntries?.find(entry => entry.year === selectedValidationYear)?.remarks || ''}</p>
+            </div>}
+            {validationMode && selectedValidationYear === validationTask(selectedItem)?.year && (
               <form
                 className="validation-entry-form md:col-span-2 border-t border-gray-200 pt-5 space-y-5"
                 onSubmit={async (event) => {
@@ -572,6 +578,13 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
         setPendingDelete(null);
       }}
     />
+    <ConfirmActionDialog
+      open={pendingValidationDelete !== null}
+      onOpenChange={open => { if (!open) setPendingValidationDelete(null); }}
+      title="Remove annual validation?"
+      description={`Remove the ${pendingValidationDelete?.year || ''} annual validation for ${pendingValidationDelete?.item.projectName || pendingValidationDelete?.item.name || 'this project'}? The project and its inspections will be kept.`}
+      onConfirm={() => { if (pendingValidationDelete) void onDeleteValidation?.(pendingValidationDelete.item.id, pendingValidationDelete.year); setPendingValidationDelete(null); }}
+    />
     <div className="flex min-h-screen flex-col gap-6 bg-[#E3EEF9] p-6">
       <div className="flex justify-between items-center">
         <div>
@@ -650,13 +663,13 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
             {validationMode ? 'Validation History' : 'Local Road Projects'}
           </h2>
         </div>
-        <span className="text-sm text-slate-500">{filteredData.length} records listed</span>
+        <span className="text-sm text-slate-500">{validationMode ? filteredData.reduce((count, item) => count + (item.annualValidationEntries?.length || 0), 0) : filteredData.length} records listed</span>
       </div>
 
         {validationMode ? (
           <div className="min-w-0 max-w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full min-w-[1100px] table-fixed border-separate border-spacing-0">
-              <colgroup><col style={{width: 240}} /><col style={{width: 290}} /><col style={{width: 160}} /><col style={{width: 130}} /><col style={{width: 120}} /><col style={{width: 160}} /></colgroup>
+              <colgroup><col style={{width: 240}} /><col style={{width: 290}} /><col style={{width: 160}} /><col style={{width: 130}} /><col style={{width: 120}} /><col style={{width: 160}} /><col style={{width: 64}} /></colgroup>
               <thead className="border-b border-gray-200 bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-600">Project Name</th>
@@ -665,30 +678,30 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-600">Date Built</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-600">Condition</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-600">Last Inspection</th>
+                  <th className="px-2 py-3"><span className="sr-only">Remove annual validation</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {filteredData.map(item => {
-                  const task = validationTask(item);
-                  const status = task?.result || 'Pending';
+                {filteredData.flatMap(item => (item.annualValidationEntries || []).map(entry => {
+                  const status = entry.result;
                   return (
                   <tr
-                    key={item.id}
+                    key={`${item.id}-${entry.year}`}
                     tabIndex={0}
-                    aria-label={`Open validation form for ${item.name}`}
+                    aria-label={`Open validation for ${item.name} ${entry.year}`}
                     onClick={() => {
                       setSelectedItem(item);
-                      setSelectedValidationYear(task?.year ?? null);
-                      setValidationResult(task?.result || '');
-                      setValidationRemarks(task?.result === 'Return for Revision' ? task.remarks || '' : '');
+                      setSelectedValidationYear(entry.year);
+                      setValidationResult(entry.result === 'Pending' ? '' : entry.result);
+                      setValidationRemarks(entry.result === 'Return for Revision' ? entry.remarks || '' : '');
                     }}
                     onKeyDown={(event) => {
                       if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
                         event.preventDefault();
                         setSelectedItem(item);
-                        setSelectedValidationYear(task?.year ?? null);
-                        setValidationResult(task?.result || '');
-                        setValidationRemarks(task?.result === 'Return for Revision' ? task.remarks || '' : '');
+                        setSelectedValidationYear(entry.year);
+                        setValidationResult(entry.result === 'Pending' ? '' : entry.result);
+                        setValidationRemarks(entry.result === 'Return for Revision' ? entry.remarks || '' : '');
                       }
                     }}
                     className="cursor-pointer hover:bg-blue-50/60 focus:outline-none focus-visible:bg-blue-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400"
@@ -705,7 +718,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                         status === 'Return for Revision' ? 'bg-amber-100 text-amber-800' :
                         'bg-gray-100 text-gray-700'
                       }`}>
-                        {status}{task?.year ? ` · Annual ${task.year}` : ''}
+                        {status} · Annual {entry.year}
                       </span>
                     </td>
                     <td className="break-words px-6 py-4">
@@ -717,9 +730,10 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{item.dateBuilt}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{item.condition}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{item.lastInspection || 'N/A'}</td>
+                    <td className="px-2 py-4 text-center">{onDeleteValidation && <button type="button" aria-label={`Remove annual validation ${entry.year} for ${item.projectName || item.name}`} title="Remove annual validation" onClick={event => { event.stopPropagation(); setPendingValidationDelete({ item, year: entry.year }); }} className="rounded-md p-2 text-slate-500 hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>}</td>
                   </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
             {filteredData.length === 0 && (
@@ -760,6 +774,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                       >
                         <td className="px-6 py-4">
                           <span className="font-medium text-[#0ea5e9]">{item.projectName || item.name || 'N/A'}</span>
+                          {isValidationLocked(item) && <span className="ml-2 inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">Validated</span>}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">{item.barangay || 'N/A'}</td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
@@ -842,7 +857,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                           return locked ? (
                             <span
                               className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800"
-                              title={`Validated for ${locked.year}. It can be edited again when the next annual validation opens.`}
+                              title={`Validated${locked.year ? ` for ${locked.year}` : ''}. It can be edited again when returned for revision.`}
                             >
                               Validated
                             </span>

@@ -288,7 +288,7 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
       return;
     }
     const invalidDate = [formData.dateStarted, formData.completionDate].some(date => !!date && !hasFourDigitYear(date));
-    const tooEarly = !!minimumMaintenanceDate && [formData.dateStarted, formData.completionDate].some(date => !!date && date < minimumMaintenanceDate);
+    const tooEarly = (!!minimumMaintenanceDate && [formData.dateStarted, formData.completionDate].some(date => !!date && date < minimumMaintenanceDate)) || (!!formData.dateStarted && !!formData.completionDate && formData.completionDate < formData.dateStarted);
     if (inspectionUnavailable || tooEarly) { setActivityError(inspectionUnavailable ? 'The linked inspection date could not be verified.' : 'Please fill out valid date.'); returnToSection(activitySectionRef, 'activity'); return; }
     if (invalidDate || !formData.maintenanceType || (editingRecordId && (!formData.dateStarted || !formData.completionDate || !formData.maintenanceActivities.trim() || !formData.remarks.trim()))) {
       setActivityError(invalidDate ? 'Please fill out valid date.' : 'Please fill out this field.');
@@ -544,7 +544,7 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
                     <input
                       type="date"
                       value={formData.completionDate}
-                      min={minimumMaintenanceDate || "2000-01-01"} max="9999-12-31"
+                      min={formData.dateStarted && (!minimumMaintenanceDate || formData.dateStarted > minimumMaintenanceDate) ? formData.dateStarted : minimumMaintenanceDate || "2000-01-01"} max="9999-12-31"
                       onInvalid={e => e.currentTarget.setCustomValidity(e.currentTarget.validity.valueMissing ? 'Please fill out this field.' : 'Please fill out valid date.')}
                       onInput={e => e.currentTarget.setCustomValidity('')}
                       onChange={(e) => setFormData({ ...formData, completionDate: e.target.value })}

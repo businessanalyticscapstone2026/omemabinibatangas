@@ -150,7 +150,7 @@ export async function PATCH(request: Request) {
       const locked = isValidationLocked(project);
       if (locked) {
         return NextResponse.json({
-          message: `This project is validated for ${locked.year}. It can be edited again when the next annual validation opens.`,
+          message: `This project is validated${locked.year ? ` for ${locked.year}` : ''}. It can be edited again after it is returned for revision.`,
         }, { status: 409 });
       }
       if (returned.length && !projectDetailsChanged(payload, current)) {

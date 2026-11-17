@@ -90,11 +90,12 @@ test('annual validation writes only validation columns and fails on zero rows', 
     const chain = {
       update(value) { calls.push({ table, value, filters: [] }); return chain; },
       eq(key, value) { calls.at(-1).filters.push([key, value]); return chain; },
+      is(key, value) { calls.at(-1).filters.push([key, value]); return chain; },
       select() { return chain; }, maybeSingle: async () => ({ data: found ? { id: 'p' } : null, error: null }),
     }; return chain;
   } };
   await dm.saveAnnualValidation(db, 'p', 2026, 'Validated', ' OK ', 'user');
-  assert.deepEqual(calls[0].filters, [['project_id', 'p'], ['year', 2026]]);
+  assert.deepEqual(calls[0].filters, [['project_id', 'p'], ['year', 2026], ['deleted_at', null]]);
   assert.equal(calls[0].value.result, 'approved'); assert.equal(calls[0].value.remarks, 'OK');
   assert.equal('due_date' in calls[0].value, false);
   found = false; await assert.rejects(dm.saveAnnualValidation(db, 'p', 2026, 'Validated', 'Done', 'user'), /Could not update/);
@@ -233,17 +234,18 @@ function loadProjectRoute(projectRef) {
   });
 }
 
-test('a validated project is locked to the encoder until the next annual validation opens', async () => {
+test('a validated project stays locked until returned for revision', async () => {
   let project = { id: 'p', name: 'Road', projectName: 'Road', actualCompletionDate: '2000-01-01',
     annualValidationEntries: [entry(2026, 'Validated', 'OK')] };
   const route = loadProjectRoute(() => project);
   const locked = await route.PATCH({ json: async () => ({ id: 'p', projectName: 'Road renamed' }) });
   assert.equal(locked.status, 409);
   assert.match(locked.body.message, /validated for 2026/i);
-  assert.match(locked.body.message, /next annual validation/i);
+  assert.match(locked.body.message, /returned for revision/i);
 
-  // The next cycle opens with a newer entry, whichever its result, and the lock lifts.
   project = { ...project, annualValidationEntries: [entry(2026, 'Validated', 'OK'), entry(2027)] };
+  assert.equal((await route.PATCH({ json: async () => ({ id: 'p', projectName: 'Road renamed' }) })).status, 409);
+  project = { ...project, annualValidationEntries: [entry(2026, 'Validated', 'OK'), entry(2027, 'Return for Revision', 'Fix')] };
   assert.equal((await route.PATCH({ json: async () => ({ id: 'p', projectName: 'Road renamed' }) })).status, 200);
 });
 
@@ -271,4 +273,48 @@ test('returned project ignores derived aliases and currency formatting but accep
   assert.equal((await patch({ dateStarted: '2020-01-01', completionDate: '2020-12-01', roadName: 'Road', contractedAmount: '1,000', locations: [' A '] })).status, 400);
   assert.equal((await patch({ contractedAmount: '2000' })).status, 200);
   assert.equal((await patch({ locations: ['A', 'B'] })).status, 200);
+});
+
+test('back-entered validation history shows every year and a separate removal control', () => {
+  const Dummy = ({children}) => React.createElement(React.Fragment,null,children);
+  const ui = new Proxy({}, {get: () => Dummy});
+  const Component = load('src/app/components/LocalRoadList.tsx', {'./ui/textarea':ui,'./ui/dialog':ui,'./ui/select':ui,'./ConfirmActionDialog':ui,'./PrintDocument':ui,'@/lib/activity-log-client':{recordClientActivity(){}},'@/lib/project-validation-workflow':workflow,'@/lib/project-form-validation':load('src/lib/project-form-validation.ts')}).LocalRoadList;
+  const road={id:'p',name:'Road',actualCompletionDate:'2023-11-11',annualValidationEntries:[entry(2024,'Validated','Done'),entry(2025,'Validated','Done'),entry(2026)]};
+  const html=renderToStaticMarkup(React.createElement(Component,{data:[road],userRole:'Staff - Validator',validationMode:true,currentUser:'User',onAdd(){},onEdit(){},onDelete(){},onDeleteValidation(){}}));
+  for (const year of [2024,2025,2026]) { assert.match(html,new RegExp(`Annual ${year}`)); assert.match(html,new RegExp(`Remove annual validation ${year} for Road`)); }
+  assert.match(html,/3 records listed/);
+});
+
+test('legacy and past validated projects remain locked through pending years until returned', () => {
+  assert.deepEqual(workflow.isValidationLocked({validationResult:'Validated',annualValidationEntries:[]}),{});
+  assert.deepEqual(workflow.isValidationLocked({annualValidationEntries:[entry(2024,'Validated'),entry(2025),entry(2026)]}),{year:2024});
+  assert.equal(workflow.isValidationLocked({annualValidationEntries:[entry(2024,'Validated'),entry(2025,'Return for Revision','Fix')]}),null);
+  assert.equal(workflow.isValidationLocked({annualValidationEntries:[entry(2024,'Validated'),entry(2025,'Pending','Fix')]}),null);
+});
+
+test('removal targets only one annual validation, requires validator access and keeps the tombstone', async () => {
+  let currentRole='validator', updates=[], logs=[];
+  const res=(status,body={})=>({status,body});
+  const db={from(table){ assert.equal(table,'annual_validation_entries'); const chain={update(value){updates.push({value,filters:[]});return chain;},eq(key,value){updates.at(-1).filters.push([key,value]);return chain;},is(key,value){updates.at(-1).filters.push([key,value]);return chain;},select(){return chain;},maybeSingle:async()=>({data:{id:'row'},error:null})};return chain;}};
+  const route=load('src/app/api/local-road/annual-validation/route.ts',{
+    'next/server':{NextResponse:{json:(body,init)=>res(init?.status||200,body)}},
+    '@/lib/api':{requireRole:async (_request,roles)=>roles.includes(currentRole)?{auth:{admin:db,userId:'u',profile:{username:'validator'}}}:{denied:res(403)},withRefresh:r=>r},
+    '@/lib/supabase-data':{addActivityLog:async (_db,entry)=>logs.push(entry)},
+  });
+  const request=body=>({json:async()=>body});
+  assert.equal((await route.DELETE(request({projectId:'p',year:2024}))).status,200);
+  assert.deepEqual(updates[0].filters,[['project_id','p'],['year',2024],['deleted_at',null]]);
+  assert.ok(updates[0].value.deleted_at); assert.match(logs[0].details,/2024/);
+  currentRole='encoder'; assert.equal((await route.DELETE(request({projectId:'p',year:2024}))).status,403);
+  currentRole='validator'; assert.equal((await route.DELETE(request({projectId:'p',year:'2024'}))).status,400);
+  assert.equal(updates.length,1);
+});
+
+test('annual generator makes all due years and does not recreate a removed year', async () => {
+  const dm=load('src/lib/supabase-data.ts',{'@/lib/attachment-validation':load('src/lib/attachment-validation.ts'),'@/lib/project-form-validation':load('src/lib/project-form-validation.ts'),'@/lib/supabase':{ROLE_FROM_DB:{},ROLE_TO_DB:{}}});
+  const RealDate=global.Date; class MockDate extends RealDate {constructor(...args){super(...(args.length?args:['2026-11-16T12:00:00Z']));} static now(){return new RealDate('2026-11-16T12:00:00Z').getTime();}}
+  const writes=[];const db={from(table){const chain={select(){return chain;},is(){return chain;},not(){return chain;},eq(){return chain;},upsert(value){writes.push({table,value});return Promise.resolve({error:null});},insert(value){writes.push({table,value});return Promise.resolve({error:null});},then(resolve,reject){const data=table==='projects'?[{id:'p',actual_completion_date:'2023-11-11'}]:table==='annual_validation_entries'?[{year:2025}]:[];return Promise.resolve({data,error:null}).then(resolve,reject);}};return chain;}};
+  try {global.Date=MockDate;await dm.ensureAnnualFollowUps(db);} finally {global.Date=RealDate;}
+  assert.deepEqual(writes.filter(w=>w.table==='annual_validation_entries').map(w=>w.value.year),[2024,2026]);
+  assert.deepEqual(writes.filter(w=>w.table==='inspections').map(w=>w.value.annual_follow_up_year),[2024,2025,2026]);
 });

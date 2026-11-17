@@ -416,7 +416,7 @@ test('edit, encoder details and validator form hide the requested fields', async
   for (const validationMode of [false, true]) {
     await reset();
     await act(async () => root.render(React.createElement(LocalRoadList, { data: [item], currentUser: 'User', userRole: validationMode ? 'Staff - Validator' : 'Staff - Encoder', validationMode, onAdd() {}, onEdit() {}, onDelete() {} })));
-    const button = container.querySelector(validationMode ? '[aria-label="Open validation form for Road"]' : '[aria-label="View details for Road"]');
+    const button = container.querySelector(validationMode ? '[aria-label="Open validation for Road 2001"]' : '[aria-label="View details for Road"]');
     assert.ok(button); await act(async () => button.click());
     assert.doesNotMatch(container.textContent, /PCAD License No\.|OLD-LICENSE/);
     assert.match(container.textContent, /Road Network ID No\./);
@@ -473,7 +473,7 @@ test('head engineer print and validator details hide requested fields and align 
   for (const [role, validationMode] of [['Head Engineer', false], ['Staff - Validator', true]]) {
     await reset(); sections = undefined;
     await act(async () => root.render(React.createElement(LocalRoadList, { data: [item], userRole: role, validationMode, currentUser: 'User', onAdd() {}, onEdit() {}, onDelete() {} })));
-    await act(async () => container.querySelector(validationMode ? '[aria-label="Open validation form for Road"]' : '[aria-label="View details for Road"]').click());
+    await act(async () => container.querySelector(validationMode ? '[aria-label="Open validation for Road 2001"]' : '[aria-label="View details for Road"]').click());
     const detail = container.querySelector('.project-details-dialog');
     assert.ok(detail);
     assert.doesNotMatch(detail.textContent, /PCAD License No\.|Actual Project Cost|Completion Percentage/);
@@ -550,7 +550,7 @@ test('validator reopens an updated returned project with an empty remarks input'
   const item = { id: 'p', name: 'Road', type: 'Road', location: 'Town', dateBuilt: '2000-01-01', condition: 'Good', actualCompletionDate: '2000-01-01', annualValidationEntries: [{ year: 2001, result: 'Pending', remarks: 'Previous revision remarks', dueDate: '2000-12-02' }] };
   await reset();
   await act(async () => root.render(React.createElement(LocalRoadList, { data: [item], userRole: 'Staff - Validator', validationMode: true, currentUser: 'User', onAdd() {}, onEdit() {}, onDelete() {} })));
-  await act(async () => container.querySelector('[aria-label="Open validation form for Road"]').click());
+  await act(async () => container.querySelector('[aria-label="Open validation for Road 2001"]').click());
   assert.equal(container.querySelector('#validation-remarks').value, '');
   const detail = container.querySelector('.project-details-dialog');
   const label = [...detail.querySelectorAll('p')].find(el => el.textContent === 'Validation Result');
@@ -659,7 +659,7 @@ test('maintenance edit uses linked inspection date as the minimum for both field
   await reset(); await act(async()=>root.render(React.createElement(MaintenanceModule,props)));
   await act(async()=>container.querySelector('[aria-label="Edit maintenance record for Road"]').click());
   const fields=[...document.querySelectorAll('.module-form-panel input[type=date]')];
-  assert.equal(fields.length,2); assert.ok(fields.every(field=>field.min==='2026-01-02'));
+  assert.equal(fields.length,2); assert.equal(fields[0].min,'2026-01-02'); assert.equal(fields[1].min,'2026-01-08');
   fields[0].value='2026-01-01'; await act(async()=>fields[0].checkValidity());
   assert.equal(fields[0].validationMessage,'Please fill out valid date.');
   fields[1].value='2026-01-01'; await act(async()=>fields[1].checkValidity());

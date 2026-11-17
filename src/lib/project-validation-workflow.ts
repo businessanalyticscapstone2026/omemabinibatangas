@@ -65,15 +65,10 @@ export function canAssignInspector(project: ValidationProject, now = new Date())
     && completed.getUTCFullYear() < now.getUTCFullYear();
 }
 
-/**
- * @mine — a validated project stays locked to the encoder until the next yearly
- * validation opens (WORKFLOW-DECISIONS Q4/B3). The lock lifts as soon as a newer
- * annual entry exists, whatever its result, because that is the next cycle.
- * Returns the validated year when locked, otherwise null.
- */
-export function isValidationLocked(project: ValidationProject): { year: number } | null {
+/** A validated project remains locked until a validator returns an annual entry. */
+export function isValidationLocked(project: ValidationProject): { year?: number } | null {
   const entries = project.annualValidationEntries ?? [];
-  if (!entries.length) return null;
-  const latest = [...entries].sort((a, b) => b.year - a.year)[0];
-  return latest.result === 'Validated' ? { year: latest.year } : null;
+  const latest = entries.filter(entry => entry.result !== 'Pending' || entry.remarks?.trim()).sort((a, b) => b.year - a.year)[0];
+  if (latest) return latest.result === 'Validated' ? { year: latest.year } : null;
+  return project.validationResult === 'Validated' ? {} : null;
 }

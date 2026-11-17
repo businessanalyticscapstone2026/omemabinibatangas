@@ -260,7 +260,8 @@ test('maintenance completion date rejects years before 2000 and invalid dates on
       assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:date}))).status,400);
     }
     assert.equal((await routes.maintenance.POST(request({...body,scheduledDate:'2026-01-08'}))).status,200);
-    assert.equal((await routes.maintenance.PATCH(request({...body,id:'m',scheduledDate:'2000-01-01'}))).status,200);
+    assert.equal((await routes.maintenance.PATCH(request({...body,id:'m',scheduledDate:'2000-01-01'}))).status,400);
+    assert.equal((await routes.maintenance.PATCH(request({...body,id:'m',scheduledDate:'2026-01-08'}))).status,200);
   } finally {Object.assign(data,old);}
 });
 
@@ -447,4 +448,22 @@ test('recording an annual follow-up requires validation for that same year', asy
     road.annualValidationEntries[0].result='Return for Revision';
     assert.equal((await routes.inspections.PUT(request(body))).status,409);
   } finally {Object.assign(data,old);}
+});
+
+test('maintenance completion cannot precede its start, including historical and unlinked records', async () => {
+  const old={listRoads:data.listRoads,listInspections:data.listInspections,listArchivedInspections:data.listArchivedInspections,listMaintenance:data.listMaintenance,listArchivedMaintenance:data.listArchivedMaintenance,saveMaintenance:data.saveMaintenance};
+  try {
+    role='encoder'; data.listRoads=async()=>[{id:'p'}];
+    data.listInspections=async()=>[{id:'i',localRoadId:'p',date:'2024-12-30',conditionRatings:{Concrete:'Fair'}}];
+    data.listArchivedInspections=async()=>[]; data.listArchivedMaintenance=async()=>[]; data.listMaintenance=async()=>[];
+    data.saveMaintenance=async(_db,payload)=>({...payload,id:'m'});
+    const body={localRoadId:'p',inspectionId:'i',dateStarted:'2025-01-03',scheduledDate:'2025-01-02',type:'Repair',description:'Repair',remarks:'Done',cost:0};
+    assert.equal((await routes.maintenance.POST(request(body))).status,400);
+    assert.equal((await routes.maintenance.POST(request({...body,scheduledDate:'2025-01-03'}))).status,200);
+    data.listMaintenance=async()=>[{id:'m',localRoadId:'p',status:'In Progress',dateStarted:'2025-01-03',scheduledDate:'2025-01-04',type:'Repair',description:'Repair',remarks:'Done'}];
+    assert.equal((await routes.maintenance.PATCH(request({...body,id:'m'}))).status,400);
+    assert.equal((await routes.maintenance.PATCH(request({...body,id:'m',scheduledDate:'2025-01-03'}))).status,200);
+    assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:'2025-01-02'}))).status,400);
+    assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:'2025-01-03'}))).status,200);
+  } finally { Object.assign(data,old); }
 });

@@ -497,6 +497,19 @@ export default function App() {
       });
   };
 
+  const handleDeleteAnnualValidation = async (projectId: string, year: number): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/local-road/annual-validation', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, year }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.message || 'Unable to remove annual validation.');
+      setLocalRoadData(previous => previous.map(item => item.id === projectId ? { ...item, annualValidationEntries: (item.annualValidationEntries || []).filter(entry => entry.year !== year) } : item));
+      return true;
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to remove annual validation.');
+      return false;
+    }
+  };
+
   const handleAssignInspector = async (projectId: string, inspectorId: string) => {
     try {
       const response = await fetch('/api/local-road/inspector-assignment', {
@@ -818,6 +831,7 @@ export default function App() {
                   validatorName={userName}
                   currentUser={userName}
                   onSaveValidation={handleSaveValidation}
+                  onDeleteValidation={handleDeleteAnnualValidation}
                   userRole={userRole}
                 />
               )}
