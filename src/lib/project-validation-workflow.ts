@@ -72,3 +72,11 @@ export function isValidationLocked(project: ValidationProject): { year?: number 
   if (latest) return latest.result === 'Validated' ? { year: latest.year } : null;
   return project.validationResult === 'Validated' ? {} : null;
 }
+
+/** The first anniversary is the project's original validation and cannot be removed. */
+export function canRemoveAnnualValidation(project: ValidationProject, year: number): boolean {
+  const raw = project.actualCompletionDate;
+  if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
+  const date = new Date(`${raw}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === raw && year > date.getUTCFullYear() + 1;
+}

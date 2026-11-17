@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-17 — [mine] Protect first validation and order annual history
+- **Type:** Modified
+- **Files:** `src/app/api/local-road/annual-validation/route.ts` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `tests/validation-workflow.test.cjs` (modified)
+- **What & why:** Keep the first anniversary validation, display saved legacy and annual validations, and list recent annual follow-ups first.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-17 — [mine] Preserve annual validation history and enforce date ordering
 - **Type:** Modified
 - **Files:** `src/app/App.tsx` (modified), `src/app/api/local-road/route.ts` (modified), `src/app/api/maintenance/route.ts` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `src/lib/supabase-data.ts` (modified), `tests/project-form.test.cjs` (modified), `tests/role-crud.test.cjs` (modified), `tests/validation-workflow.test.cjs` (modified), `src/app/api/local-road/annual-validation/` (new), `supabase/migrations/20261119_archive_annual_validation.sql` (new)

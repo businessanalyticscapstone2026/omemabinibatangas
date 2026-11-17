@@ -281,7 +281,12 @@ test('back-entered validation history shows every year and a separate removal co
   const Component = load('src/app/components/LocalRoadList.tsx', {'./ui/textarea':ui,'./ui/dialog':ui,'./ui/select':ui,'./ConfirmActionDialog':ui,'./PrintDocument':ui,'@/lib/activity-log-client':{recordClientActivity(){}},'@/lib/project-validation-workflow':workflow,'@/lib/project-form-validation':load('src/lib/project-form-validation.ts')}).LocalRoadList;
   const road={id:'p',name:'Road',actualCompletionDate:'2023-11-11',annualValidationEntries:[entry(2024,'Validated','Done'),entry(2025,'Validated','Done'),entry(2026)]};
   const html=renderToStaticMarkup(React.createElement(Component,{data:[road],userRole:'Staff - Validator',validationMode:true,currentUser:'User',onAdd(){},onEdit(){},onDelete(){},onDeleteValidation(){}}));
-  for (const year of [2024,2025,2026]) { assert.match(html,new RegExp(`Annual ${year}`)); assert.match(html,new RegExp(`Remove annual validation ${year} for Road`)); }
+  for (const year of [2024,2025,2026]) assert.match(html,new RegExp(`Annual ${year}`));
+  for (const year of [2025,2026]) assert.match(html,new RegExp(`Remove annual validation ${year} for Road`));
+  assert.doesNotMatch(html,/Remove annual validation 2024 for Road/);
+  assert.ok(html.indexOf('Annual 2026') < html.indexOf('Annual 2025') && html.indexOf('Annual 2025') < html.indexOf('Annual 2024'));
+  const legacy=renderToStaticMarkup(React.createElement(Component,{data:[{id:'legacy',name:'Older',validationResult:'Validated',validationRemarks:'Passed',annualValidationEntries:[]}],userRole:'Staff - Validator',validationMode:true,currentUser:'User',onAdd(){},onEdit(){},onDelete(){}}));
+  assert.match(legacy,/Validated · Initial validation/); assert.match(legacy,/Older/);
   assert.match(html,/3 records listed/);
 });
 
@@ -298,13 +303,15 @@ test('removal targets only one annual validation, requires validator access and 
   const db={from(table){ assert.equal(table,'annual_validation_entries'); const chain={update(value){updates.push({value,filters:[]});return chain;},eq(key,value){updates.at(-1).filters.push([key,value]);return chain;},is(key,value){updates.at(-1).filters.push([key,value]);return chain;},select(){return chain;},maybeSingle:async()=>({data:{id:'row'},error:null})};return chain;}};
   const route=load('src/app/api/local-road/annual-validation/route.ts',{
     'next/server':{NextResponse:{json:(body,init)=>res(init?.status||200,body)}},
-    '@/lib/api':{requireRole:async (_request,roles)=>roles.includes(currentRole)?{auth:{admin:db,userId:'u',profile:{username:'validator'}}}:{denied:res(403)},withRefresh:r=>r},
+    '@/lib/api':{requireRole:async (_request,roles)=>roles.includes(currentRole)?{auth:{admin:db,db:{from:()=>({select(){return this},eq(){return this},is(){return this},maybeSingle:async()=>({data:{actual_completion_date:'2023-11-11'},error:null})})},userId:'u',profile:{username:'validator'}}}:{denied:res(403)},withRefresh:r=>r},
     '@/lib/supabase-data':{addActivityLog:async (_db,entry)=>logs.push(entry)},
+    '@/lib/project-validation-workflow':workflow,
   });
   const request=body=>({json:async()=>body});
-  assert.equal((await route.DELETE(request({projectId:'p',year:2024}))).status,200);
-  assert.deepEqual(updates[0].filters,[['project_id','p'],['year',2024],['deleted_at',null]]);
-  assert.ok(updates[0].value.deleted_at); assert.match(logs[0].details,/2024/);
+  assert.equal((await route.DELETE(request({projectId:'p',year:2024}))).status,403);
+  assert.equal((await route.DELETE(request({projectId:'p',year:2025}))).status,200);
+  assert.deepEqual(updates[0].filters,[['project_id','p'],['year',2025],['deleted_at',null]]);
+  assert.ok(updates[0].value.deleted_at); assert.match(logs[0].details,/2025/);
   currentRole='encoder'; assert.equal((await route.DELETE(request({projectId:'p',year:2024}))).status,403);
   currentRole='validator'; assert.equal((await route.DELETE(request({projectId:'p',year:'2024'}))).status,400);
   assert.equal(updates.length,1);
