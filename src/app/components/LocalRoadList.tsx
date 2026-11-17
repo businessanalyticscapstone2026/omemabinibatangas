@@ -784,7 +784,6 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                       >
                         <td className="px-6 py-4">
                           <span className="font-medium text-[#0ea5e9]">{item.projectName || item.name || 'N/A'}</span>
-                          {isValidationLocked(item) && <span className="ml-2 inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-800">Validated</span>}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">{item.barangay || 'N/A'}</td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
@@ -862,7 +861,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                           <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">For Revision</span>
                         )}
                         {!isAdminReadDeleteOnly && (() => {
-                          // @mine — task 3: a validated project is locked until the next cycle opens.
+                          // A validated project stays locked until returned for revision.
                           const locked = userRole === 'Staff - Encoder' ? isValidationLocked(item) : null;
                           return locked ? (
                             <span

@@ -61,6 +61,20 @@ test('encoder sees the revision badge immediately before Edit, but not after val
   assert.doesNotMatch(render({ ...project, validationResult: undefined, validationRemarks: 'Fix', annualValidationEntries: [] }, 'Staff - Encoder'), />For Revision<\/span>/);
 });
 
+test('Head Engineer project list hides the validated badge while Encoder still sees it', () => {
+  const Dummy = ({children}) => React.createElement(React.Fragment, null, children);
+  const ui = new Proxy({}, { get: () => Dummy });
+  const Component = load('src/app/components/LocalRoadList.tsx', {
+    './ui/textarea': ui, './ui/dialog': ui, './ui/select': ui, './ConfirmActionDialog': ui, './PrintDocument': ui,
+    '@/lib/activity-log-client': {recordClientActivity() {}}, '@/lib/project-validation-workflow': workflow,
+    '@/lib/project-form-validation': load('src/lib/project-form-validation.ts'),
+  }).LocalRoadList;
+  const project = {id:'p',name:'Road',actualCompletionDate:'2023-01-01',annualValidationEntries:[entry(2024,'Validated','Done')]};
+  const render = role => renderToStaticMarkup(React.createElement(Component,{data:[project],userRole:role,currentUser:'User',onAdd(){},onEdit(){},onDelete(){}}));
+  assert.doesNotMatch(render('Head Engineer'),/>Validated<\/span>/);
+  assert.match(render('Staff - Encoder'),/>Validated<\/span>/);
+});
+
 test('validator can only update a currently due annual task, never an initial decision', async () => {
   let role = 'validator', project = { id: 'p', name: 'Road', actualCompletionDate: '2000-01-01', annualValidationEntries: [entry(2005)] }, calls = [];
   const res = (status, body = {}) => ({ status, body });
