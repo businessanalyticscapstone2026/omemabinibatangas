@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-17 — [mine] Hide completed validations from validator table
+- **Type:** Modified
+- **Files:** `src/app/components/LocalRoadList.tsx` (modified), `tests/validation-workflow.test.cjs` (modified)
+- **What & why:** Keep approved annual and legacy validations in storage while showing pending or returned validation entries in newest-year order.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-17 — [mine] Show inspected projects in AI recommendations automatically
 - **Type:** Modified
 - **Files:** `src/app/App.tsx` (modified), `src/app/api/ai-priority/route.ts` (modified), `src/app/components/AIPredictionModule.tsx` (modified), `src/lib/supabase-data.ts` (modified), `tests/project-form.test.cjs` (modified)

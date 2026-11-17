@@ -235,7 +235,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
       : showsAssignTable
       ? [item.projectName || item.name, item.barangay || 'N/A', item.contractedAmount && `Php ${formatSavedProjectCurrency(item.contractedAmount)}`, date, inspectors.find(person => person.id === item.inspectorId)?.name || (canAssignInspector(item) ? 'Not Assigned' : 'Awaiting Validation')]
       : [item.projectName || item.name, item.barangay || 'Location not set', item.dateBuilt || 'Not set', item.lastInspection || 'Not recorded', latestValidation(item).result === 'Return for Revision' ? 'For Revision' : ''];
-    const matchesSearch = searchValues.some(value => String(value ?? '').toLowerCase().includes(query));
+    const matchesSearch = validationMode || searchValues.some(value => String(value ?? '').toLowerCase().includes(query));
     const matchesDate = !usesDateFilter || !filterCompletionDate || date === filterCompletionDate;
     const matchesLocation = usesDateFilter || filterLocation === 'All' || (item.barangay || item.location) === filterLocation;
     const isEligibleForValidation = !validationMode || (item.annualValidationEntries?.length ?? 0) > 0 || !!item.validationResult;
@@ -244,9 +244,12 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
 
   // Sort individual entries rather than projects, so the most recent year is first.
   const validationRows = filteredData.flatMap(item => [
-    ...(item.annualValidationEntries || []).map(entry => ({ item, entry, year: entry.year as number | null })),
-    ...(item.validationResult ? [{ item, entry: { result: item.validationResult, remarks: item.validationRemarks || '' }, year: null }] : []),
-  ]).sort((a, b) => (b.year ?? -1) - (a.year ?? -1));
+    ...(item.annualValidationEntries || []).filter(entry => entry.result !== 'Validated').map(entry => ({ item, entry, year: entry.year as number | null })),
+    ...(item.validationResult === 'Return for Revision' ? [{ item, entry: { result: item.validationResult, remarks: item.validationRemarks || '' }, year: null }] : []),
+  ]).filter(({ item, entry, year }) => {
+    const query = searchTerm.trim().toLowerCase();
+    return [item.projectName || item.name, entry.result, year == null ? 'Initial validation' : `Annual ${year}`, item.barangay || 'N/A', item.dateBuilt, item.condition, item.lastInspection || 'N/A'].some(value => String(value ?? '').toLowerCase().includes(query));
+  }).sort((a, b) => (b.year ?? -1) - (a.year ?? -1));
 
   const locations = [
     'All',
@@ -743,8 +746,8 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                 })}
               </tbody>
             </table>
-            {filteredData.length === 0 && (
-              <div className="py-12 text-center text-gray-500">No local road found matching your criteria.</div>
+            {validationRows.length === 0 && (
+              <div className="py-12 text-center text-gray-500">No pending or returned validations found.</div>
             )}
           </div>
         ) : (
@@ -904,7 +907,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
         )}
       <div className="mb-10 mt-auto flex flex-col gap-2 border-t border-slate-200 px-1 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
         <span>
-          Showing {filteredData.length} of {data.length} total {validationMode ? 'validation projects' : 'registered road projects'}
+          {validationMode ? `Showing ${validationRows.length} pending or returned validation entries` : `Showing ${filteredData.length} of ${data.length} total registered road projects`}
         </span>
         <span className="font-medium text-blue-700">Municipality of Mabini, Batangas</span>
       </div>

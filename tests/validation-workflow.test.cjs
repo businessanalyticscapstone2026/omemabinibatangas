@@ -275,19 +275,22 @@ test('returned project ignores derived aliases and currency formatting but accep
   assert.equal((await patch({ locations: ['A', 'B'] })).status, 200);
 });
 
-test('back-entered validation history shows every year and a separate removal control', () => {
+test('validation table hides validated years but retains pending and returned years newest first', () => {
   const Dummy = ({children}) => React.createElement(React.Fragment,null,children);
   const ui = new Proxy({}, {get: () => Dummy});
   const Component = load('src/app/components/LocalRoadList.tsx', {'./ui/textarea':ui,'./ui/dialog':ui,'./ui/select':ui,'./ConfirmActionDialog':ui,'./PrintDocument':ui,'@/lib/activity-log-client':{recordClientActivity(){}},'@/lib/project-validation-workflow':workflow,'@/lib/project-form-validation':load('src/lib/project-form-validation.ts')}).LocalRoadList;
-  const road={id:'p',name:'Road',actualCompletionDate:'2023-11-11',annualValidationEntries:[entry(2024,'Validated','Done'),entry(2025,'Validated','Done'),entry(2026)]};
-  const html=renderToStaticMarkup(React.createElement(Component,{data:[road],userRole:'Staff - Validator',validationMode:true,currentUser:'User',onAdd(){},onEdit(){},onDelete(){},onDeleteValidation(){}}));
-  for (const year of [2024,2025,2026]) assert.match(html,new RegExp(`Annual ${year}`));
+  const road={id:'p',name:'Road',actualCompletionDate:'2023-11-11',annualValidationEntries:[entry(2024,'Validated','Done'),entry(2025,'Return for Revision','Fix'),entry(2026)]};
+  const props={userRole:'Staff - Validator',validationMode:true,currentUser:'User',onAdd(){},onEdit(){},onDelete(){},onDeleteValidation(){}};
+  const html=renderToStaticMarkup(React.createElement(Component,{...props,data:[road]}));
+  assert.doesNotMatch(html,/Annual 2024/);
+  assert.match(html,/Return for Revision · Annual 2025/); assert.match(html,/Pending · Annual 2026/);
+  assert.ok(html.indexOf('Annual 2026') < html.indexOf('Annual 2025'));
   for (const year of [2025,2026]) assert.match(html,new RegExp(`Remove annual validation ${year} for Road`));
-  assert.doesNotMatch(html,/Remove annual validation 2024 for Road/);
-  assert.ok(html.indexOf('Annual 2026') < html.indexOf('Annual 2025') && html.indexOf('Annual 2025') < html.indexOf('Annual 2024'));
-  const legacy=renderToStaticMarkup(React.createElement(Component,{data:[{id:'legacy',name:'Older',validationResult:'Validated',validationRemarks:'Passed',annualValidationEntries:[]}],userRole:'Staff - Validator',validationMode:true,currentUser:'User',onAdd(){},onEdit(){},onDelete(){}}));
-  assert.match(legacy,/Validated · Initial validation/); assert.match(legacy,/Older/);
-  assert.match(html,/3 records listed/);
+  assert.match(html,/2 records listed/);
+  const legacy=renderToStaticMarkup(React.createElement(Component,{...props,data:[{id:'legacy',name:'Older',validationResult:'Validated',annualValidationEntries:[]}]}));
+  assert.doesNotMatch(legacy,/Validated · Initial validation/); assert.match(legacy,/No pending or returned validations found/);
+  const complete=renderToStaticMarkup(React.createElement(Component,{...props,data:[{...road,annualValidationEntries:[entry(2024,'Validated'),entry(2025,'Validated'),entry(2026,'Validated')]}]}));
+  assert.doesNotMatch(complete,/Annual 202[456]/); assert.match(complete,/No pending or returned validations found/);
 });
 
 test('legacy and past validated projects remain locked through pending years until returned', () => {
