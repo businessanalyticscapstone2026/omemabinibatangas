@@ -337,7 +337,7 @@ async function attachRoadExtras(db: SupabaseClient, records: StoredRecord[]): Pr
   if (!records.length) return records;
   const ids = records.map((r) => r.id);
   const [{ data: entryRows, error: entriesError }, { data: followRows }, { data: attachRows }] = await Promise.all([
-    db.from('annual_validation_entries').select('*').in('project_id', ids).order('year'),
+    db.from('annual_validation_entries').select('*').in('project_id', ids).is('deleted_at', null).order('year'),
     db.from('inspections').select('project_id, annual_follow_up_year').in('project_id', ids).eq('inspection_type', 'follow_up').not('annual_follow_up_year', 'is', null),
     db.from('attachments').select('*').in('project_id', ids).order('created_at'),
   ]);
@@ -391,14 +391,14 @@ export async function saveAnnualValidation(
   const { data, error } = await db.from('annual_validation_entries').update({
     result: VALIDATION_TO_DB[result], remarks: remarks.trim(),
     validated_by: userId, validated_at: new Date().toISOString(),
-  }).eq('project_id', projectId).eq('year', year).select('id').maybeSingle();
+  }).eq('project_id', projectId).eq('year', year).is('deleted_at', null).select('id').maybeSingle();
   if (error) throw error;
   if (!data) throw new Error('Could not update this annual validation.');
 }
 
 /** @mine — requeue the same returned annual decision, retaining its remarks. */
 export async function requeueReturnedValidation(admin: SupabaseClient, projectId: string, year: number, validatedAt: string | undefined, remarks: string): Promise<boolean> {
-  let query = admin.from('annual_validation_entries').update({ result: 'pending' }).eq('project_id', projectId).eq('year', year).eq('result', 'rejected').eq('remarks', remarks);
+  let query = admin.from('annual_validation_entries').update({ result: 'pending' }).eq('project_id', projectId).eq('year', year).is('deleted_at', null).eq('result', 'rejected').eq('remarks', remarks);
   query = validatedAt ? query.eq('validated_at', validatedAt) : query.is('validated_at', null);
   const { data, error } = await query.select('id').maybeSingle();
   if (error) throw error;
@@ -1298,6 +1298,7 @@ export async function getLatestAiPredictions(admin: SupabaseClient): Promise<Sto
       localRoadName: str(factors.name) || road.road_name || project.project_name || '',
       type: str(factors.type) || project.project_categories?.name || '',
       lastInspection: str(factors.lastInspection) || str(road.last_inspection_date) || 'N/A',
+      ...(factors.inspectionFingerprint ? { inspectionFingerprint: str(factors.inspectionFingerprint) } : {}),
       condition: str(factors.condition) || cap(road.current_condition) || 'Good',
       riskLevel: RISK_FROM_DB[row.risk_level] ?? 'Low',
       priorityScore: Number(row.priority_score ?? 0),

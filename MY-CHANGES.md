@@ -78,6 +78,41 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-17 — [mine] Remove validated badge from Head Engineer project list
+- **Type:** Modified
+- **Files:** `src/app/components/LocalRoadList.tsx` (modified), `tests/validation-workflow.test.cjs` (modified)
+- **What & why:** Keep the Head Engineer project list uncluttered while preserving the Encoder validation badge and editing lock.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-17 — [mine] Hide completed validations from validator table
+- **Type:** Modified
+- **Files:** `src/app/components/LocalRoadList.tsx` (modified), `tests/validation-workflow.test.cjs` (modified)
+- **What & why:** Keep approved annual and legacy validations in storage while showing pending or returned validation entries in newest-year order.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-17 — [mine] Show inspected projects in AI recommendations automatically
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/api/ai-priority/route.ts` (modified), `src/app/components/AIPredictionModule.tsx` (modified), `src/lib/supabase-data.ts` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Build the recommendation table from eligible latest inspections and reserve generation for AI text updates; identify stale results after inspection changes.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-17 — [mine] Protect first validation and order annual history
+- **Type:** Modified
+- **Files:** `src/app/api/local-road/annual-validation/route.ts` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `tests/validation-workflow.test.cjs` (modified)
+- **What & why:** Keep the first anniversary validation, display saved legacy and annual validations, and list recent annual follow-ups first.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-17 — [mine] Preserve annual validation history and enforce date ordering
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/api/local-road/route.ts` (modified), `src/app/api/maintenance/route.ts` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `src/lib/supabase-data.ts` (modified), `tests/project-form.test.cjs` (modified), `tests/role-crud.test.cjs` (modified), `tests/validation-workflow.test.cjs` (modified), `src/app/api/local-road/annual-validation/` (new), `supabase/migrations/20261119_archive_annual_validation.sql` (new)
+- **What & why:** Show and remove individual annual follow-ups without regenerating them, lock validated projects until returned for revision, and validate maintenance dates.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-16 — [mine] Limit activity log details to two lines
 - **Type:** Modified
 - **Files:** `src/app/components/UserManagementModule.tsx` (modified), `tests/archive-delete-confirmation.test.cjs` (modified)

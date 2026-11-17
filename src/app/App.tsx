@@ -395,7 +395,7 @@ export default function App() {
     setShowLocalRoadForm(false);
     setEditingLocalRoad(null);
     setActiveTab(tab);
-    if (tab === 'validation-management' || tab === 'project-management') window.dispatchEvent(new Event('local-road-records-changed'));
+    if (tab === 'validation-management' || tab === 'project-management' || tab === 'ai') window.dispatchEvent(new Event('local-road-records-changed'));
   };
 
   const handleAiRecommendationsChange = (recommendations: PredictionResult[]) => {
@@ -495,6 +495,19 @@ export default function App() {
         console.error('Failed to delete local road record.', error);
         window.alert(error instanceof Error ? error.message : 'Unable to delete this road.');
       });
+  };
+
+  const handleDeleteAnnualValidation = async (projectId: string, year: number): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/local-road/annual-validation', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, year }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.message || 'Unable to remove annual validation.');
+      setLocalRoadData(previous => previous.map(item => item.id === projectId ? { ...item, annualValidationEntries: (item.annualValidationEntries || []).filter(entry => entry.year !== year) } : item));
+      return true;
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Unable to remove annual validation.');
+      return false;
+    }
   };
 
   const handleAssignInspector = async (projectId: string, inspectorId: string) => {
@@ -818,6 +831,7 @@ export default function App() {
                   validatorName={userName}
                   currentUser={userName}
                   onSaveValidation={handleSaveValidation}
+                  onDeleteValidation={handleDeleteAnnualValidation}
                   userRole={userRole}
                 />
               )}

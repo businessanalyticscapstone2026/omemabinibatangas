@@ -36,6 +36,7 @@ export async function POST(request: Request) {
   for (const date of [payload.dateStarted, payload.scheduledDate]) {
     if (date != null && date !== '' && (typeof date !== 'string' || !hasFourDigitYear(date))) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
   }
+  if (typeof payload.dateStarted === 'string' && payload.dateStarted && typeof payload.scheduledDate === 'string' && payload.scheduledDate && payload.scheduledDate < payload.dateStarted) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
   if (typeof payload.inspectionId !== 'string' || !payload.inspectionId) return NextResponse.json({ message: 'Select a project with an eligible inspection.' }, { status: 400 });
   try {
     const [inspections, active, archived, archivedInspections] = await Promise.all([listInspections(auth.db), listMaintenance(auth.db), listArchivedMaintenance(auth.db), listArchivedInspections(auth.db)]);
@@ -87,6 +88,8 @@ export async function PATCH(request: Request) {
         if (!minimum) return NextResponse.json({ message: 'The linked inspection date could not be verified.' }, { status: 409 });
         if (String(payload.completedDate) < minimum) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
       }
+      if (typeof payload.completedDate === 'string' && payload.completedDate && typeof record.dateStarted === 'string' && record.dateStarted && payload.completedDate < record.dateStarted) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
+      if (payload.status === 'Completed' && typeof record.dateStarted === 'string' && typeof record.scheduledDate === 'string' && record.scheduledDate < record.dateStarted) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
       const allowed: Record<string, string[]> = { Scheduled: ['In Progress', 'Deferred'], Deferred: ['In Progress'], 'In Progress': ['Completed', 'Deferred'], Completed: [] };
       if (!allowed[String(record.status)]?.includes(String(payload.status))) return NextResponse.json({ message: 'This status change is not allowed.' }, { status: 409 });
       if (payload.status === 'Completed' && (!hasFourDigitYear(String(record.dateStarted || '')) || !hasFourDigitYear(String(record.scheduledDate || '')) || !String(record.type || '').trim() || !String(record.description || '').trim() || !String(record.remarks || '').trim())) return NextResponse.json({ message: 'Complete the maintenance information before marking it completed.' }, { status: 409 });
@@ -104,6 +107,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: 'Valid maintenance details are required.' }, { status: 400 });
     }
     if (!hasFourDigitYear(payload.scheduledDate) || typeof payload.dateStarted !== 'string' || !hasFourDigitYear(payload.dateStarted)) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
+    if (payload.scheduledDate < payload.dateStarted) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
     if (!payload.type.trim() || !payload.description.trim()) return NextResponse.json({ message: 'Please fill out this field.' }, { status: 400 });
     if (record.inspectionId) {
       const [activeInspections, archivedInspections] = await Promise.all([listInspections(auth.db), listArchivedInspections(auth.db)]);

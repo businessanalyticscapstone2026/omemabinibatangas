@@ -416,7 +416,7 @@ test('edit, encoder details and validator form hide the requested fields', async
   for (const validationMode of [false, true]) {
     await reset();
     await act(async () => root.render(React.createElement(LocalRoadList, { data: [item], currentUser: 'User', userRole: validationMode ? 'Staff - Validator' : 'Staff - Encoder', validationMode, onAdd() {}, onEdit() {}, onDelete() {} })));
-    const button = container.querySelector(validationMode ? '[aria-label="Open validation form for Road"]' : '[aria-label="View details for Road"]');
+    const button = container.querySelector(validationMode ? '[aria-label="Open validation for Road 2001"]' : '[aria-label="View details for Road"]');
     assert.ok(button); await act(async () => button.click());
     assert.doesNotMatch(container.textContent, /PCAD License No\.|OLD-LICENSE/);
     assert.match(container.textContent, /Road Network ID No\./);
@@ -473,7 +473,7 @@ test('head engineer print and validator details hide requested fields and align 
   for (const [role, validationMode] of [['Head Engineer', false], ['Staff - Validator', true]]) {
     await reset(); sections = undefined;
     await act(async () => root.render(React.createElement(LocalRoadList, { data: [item], userRole: role, validationMode, currentUser: 'User', onAdd() {}, onEdit() {}, onDelete() {} })));
-    await act(async () => container.querySelector(validationMode ? '[aria-label="Open validation form for Road"]' : '[aria-label="View details for Road"]').click());
+    await act(async () => container.querySelector(validationMode ? '[aria-label="Open validation for Road 2001"]' : '[aria-label="View details for Road"]').click());
     const detail = container.querySelector('.project-details-dialog');
     assert.ok(detail);
     assert.doesNotMatch(detail.textContent, /PCAD License No\.|Actual Project Cost|Completion Percentage/);
@@ -550,7 +550,7 @@ test('validator reopens an updated returned project with an empty remarks input'
   const item = { id: 'p', name: 'Road', type: 'Road', location: 'Town', dateBuilt: '2000-01-01', condition: 'Good', actualCompletionDate: '2000-01-01', annualValidationEntries: [{ year: 2001, result: 'Pending', remarks: 'Previous revision remarks', dueDate: '2000-12-02' }] };
   await reset();
   await act(async () => root.render(React.createElement(LocalRoadList, { data: [item], userRole: 'Staff - Validator', validationMode: true, currentUser: 'User', onAdd() {}, onEdit() {}, onDelete() {} })));
-  await act(async () => container.querySelector('[aria-label="Open validation form for Road"]').click());
+  await act(async () => container.querySelector('[aria-label="Open validation for Road 2001"]').click());
   assert.equal(container.querySelector('#validation-remarks').value, '');
   const detail = container.querySelector('.project-details-dialog');
   const label = [...detail.querySelectorAll('p')].find(el => el.textContent === 'Validation Result');
@@ -659,7 +659,7 @@ test('maintenance edit uses linked inspection date as the minimum for both field
   await reset(); await act(async()=>root.render(React.createElement(MaintenanceModule,props)));
   await act(async()=>container.querySelector('[aria-label="Edit maintenance record for Road"]').click());
   const fields=[...document.querySelectorAll('.module-form-panel input[type=date]')];
-  assert.equal(fields.length,2); assert.ok(fields.every(field=>field.min==='2026-01-02'));
+  assert.equal(fields.length,2); assert.equal(fields[0].min,'2026-01-02'); assert.equal(fields[1].min,'2026-01-08');
   fields[0].value='2026-01-01'; await act(async()=>fields[0].checkValidity());
   assert.equal(fields[0].validationMessage,'Please fill out valid date.');
   fields[1].value='2026-01-01'; await act(async()=>fields[1].checkValidity());
@@ -1040,4 +1040,37 @@ test('AI recommendations render project data in a prioritized table', async () =
   assert.deepEqual([...container.querySelectorAll('th')].map(x=>x.textContent),['Project Name','Category','Condition','AI Justification','Recommended Maintenance Activity']);
   const rows=[...container.querySelectorAll('tbody tr')];assert.equal(rows.length,2);assert.deepEqual([...rows[0].cells].map(x=>x.textContent),['Project Beta','Bridge','Fair','Cracks','Repair']);
   await reset();
+});
+
+test('AI table automatically shows eligible inspected projects without generating, and marks older AI results', async () => {
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx');
+  const roads=[{id:'a',name:'First',condition:'Fair'}, {id:'b',name:'New',condition:'Poor'}, {id:'c',name:'Good',condition:'Good'}];
+  let inspections=[{id:'i1',localRoadId:'a',date:'2026-01-01',conditionRatings:{Concrete:'Fair'},conditionRating:6}];
+  const calls=[]; const previousFetch=global.fetch;
+  global.fetch=async (...args)=>{ calls.push(args); throw new Error('unexpected request'); };
+  try {
+    await reset();
+    const render=async (predictions=[])=>act(async()=>root.render(React.createElement(AIPredictionModule,{localRoadData:roads,inspections,predictions,onPredictionsChange(){}})));
+    await render();
+    assert.match(container.textContent,/First/);assert.match(container.textContent,/Not generated yet/);assert.equal(calls.length,0);
+    inspections=[...inspections,{id:'i2',localRoadId:'b',date:'2026-02-01',conditionRatings:{Concrete:'Poor'},conditionRating:3},{localRoadId:'c',date:'2026-02-01',conditionRatings:{Concrete:'Good'}},{localRoadId:'b',date:'2027-01-01',isScheduledAnnualFollowUp:true,conditionRatings:{Concrete:'Bad'}}];
+    await render([{localRoadId:'a',condition:'Fair',priorityScore:20,lastInspection:'2025-01-01',justification:'Earlier assessment',recommendation:'Repair'}]);
+    assert.match(container.textContent,/New/);assert.doesNotMatch(container.textContent,/Good/);assert.match(container.textContent,/Earlier assessment/);assert.match(container.textContent,/Based on an older inspection/);assert.equal(calls.length,0);
+    assert.equal(container.querySelectorAll('tbody tr').length,2);
+  } finally {global.fetch=previousFetch;await reset();}
+});
+
+test('AI generation uses latest eligible inspection dates and stores the inspection fingerprint', async () => {
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx');
+  const roads=[{id:'a',name:'Road',condition:'Fair',lastInspection:'2024-01-01'}];
+  const inspections=[{id:'i',localRoadId:'a',date:'2026-01-01',conditionRatings:{Concrete:'Fair'},conditionRating:6,remarks:'Crack'}];
+  let requestBody,saved; const previousFetch=global.fetch;
+  global.fetch=async (_url,options)=>{requestBody=JSON.parse(options.body);return {ok:true,json:async()=>({data:[{localRoadId:'a',riskLevel:'Medium',priorityScore:50,justification:'Cracks',recommendation:'Repair'}]})};};
+  try {
+    await reset(); await act(async()=>root.render(React.createElement(AIPredictionModule,{localRoadData:roads,inspections,predictions:[],onPredictionsChange:results=>{saved=results;}})));
+    await act(async()=>[...container.querySelectorAll('button')].find(button=>button.textContent.includes('Generate Recommendations')).click());
+    assert.equal(requestBody.items[0].lastInspection,'2026-01-01');
+    assert.ok(requestBody.items[0].inspectionFingerprint.includes('Crack'));
+    assert.equal(saved[0].inspectionFingerprint,requestBody.items[0].inspectionFingerprint);
+  } finally {global.fetch=previousFetch;await reset();}
 });

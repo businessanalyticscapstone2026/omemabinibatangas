@@ -50,7 +50,7 @@ export async function POST(request: Request) {
         if (item && typeof item.id === 'string') {
           factorsByProjectId[item.id] = {
             name: item.name, type: item.type, condition: item.condition,
-            lastInspection: item.lastInspection, dateBuilt: item.dateBuilt,
+            lastInspection: item.lastInspection, dateBuilt: item.dateBuilt, inspectionFingerprint: item.inspectionFingerprint,
           };
         }
       }
