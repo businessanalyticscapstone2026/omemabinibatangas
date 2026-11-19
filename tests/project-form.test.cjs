@@ -363,33 +363,68 @@ test('save failures leave the form open and display the error after the delay', 
   } finally { startDelay = () => Promise.resolve(); }
 });
 
-test('validation buttons show Saving... and Submitting... while awaiting the request', async () => {
+test('validation requires both confirmation steps, guards duplicate submissions and preserves failed decisions', async () => {
   const Dummy = ({ children }) => React.createElement(React.Fragment, null, children);
   const ui = new Proxy({}, { get: () => Dummy });
+  let closeConfirmation;
+  const Dialog = ({ children, open, onOpenChange }) => {
+    // Only the decision dialog has this title rendered in its children.
+    if (open && React.Children.toArray(children).some(child => child?.props?.children?.some?.(part => part?.props?.children === 'Are you sure?'))) closeConfirmation = () => onOpenChange(false);
+    return React.createElement(React.Fragment, null, children);
+  };
   const { LocalRoadList } = loadTs('src/app/components/LocalRoadList.tsx', {
     './ui/textarea': { AutoGrowTextarea: props => React.createElement('textarea', props) },
-    './ui/dialog': ui, './ui/select': ui, './ConfirmActionDialog': ui, './PrintDocument': ui,
+    './ui/dialog': { ...ui, Dialog, DialogContent: Dummy, DialogDescription: Dummy, DialogTitle: Dummy }, './ui/select': ui, './ConfirmActionDialog': ui, './PrintDocument': ui,
     '@/lib/activity-log-client': { recordClientActivity: async () => {} },
     '@/lib/project-validation-workflow': loadTs('src/lib/project-validation-workflow.ts'),
     '@/lib/project-form-validation': validation,
   });
+  const button = text => Array.from(container.querySelectorAll('button')).find(node => node.textContent === text);
   for (const result of ['Return for Revision', 'Validated']) {
-    let finishSave, calls = 0;
+    let finishSave, calls = 0, args;
     const item = { id: 'p', name: 'Road', type: 'Road', location: 'Town', dateBuilt: '', condition: 'Good', actualCompletionDate: '2000-01-01', annualValidationEntries: [{ year: 2001, result: 'Return for Revision', remarks: 'Fix it', dueDate: '2000-12-02' }] };
     await reset();
-    await act(async () => root.render(React.createElement(LocalRoadList, { data: [item], currentUser: 'User', userRole: 'Staff - Validator', validationMode: true, onAdd() {}, onEdit() {}, onDelete() {}, onSaveValidation: () => { calls++; return new Promise(resolve => { finishSave = resolve; }); } })));
+    await act(async () => root.render(React.createElement(LocalRoadList, { data: [item], currentUser: 'User', userRole: 'Staff - Validator', validationMode: true, onAdd() {}, onEdit() {}, onDelete() {}, onSaveValidation: (...received) => { args = received; calls++; return new Promise(resolve => { finishSave = resolve; }); } })));
     await act(async () => container.querySelector('tr[aria-label]').click());
     if (result === 'Validated') await act(async () => container.querySelector('input[value="Validated"]').click());
     const form = container.querySelector('.validation-entry-form');
     await act(async () => form.requestSubmit());
-    const button = form.querySelector('button[type=submit]');
-    assert.equal(button.disabled, true);
-    assert.equal(button.textContent, result === 'Validated' ? 'Submitting...' : 'Saving...');
-    await act(async () => form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })));
+    assert.equal(calls, 0);
+    assert.match(container.textContent, result === 'Validated' ? /Confirm validation\?/ : /Return this project for revision\?/);
+    assert.match(container.textContent, /2001/);
+    if (result === 'Return for Revision') assert.match(container.textContent, /Revision remarksFix it/);
+    await act(async () => button('Go Back').click());
+    assert.equal(container.querySelector('#validation-remarks').value, 'Fix it');
+    assert.equal(calls, 0);
+    await act(async () => form.requestSubmit());
+    await act(async () => button(result === 'Validated' ? 'Confirm Validation' : 'Confirm Return').click());
+    assert.match(container.textContent, /Are you sure\?/);
+    assert.equal(calls, 0);
+    await act(async () => button('Go Back').click());
+    assert.equal(button('Yes, Submit'), undefined);
+    await act(async () => button(result === 'Validated' ? 'Confirm Validation' : 'Confirm Return').click());
+    assert.equal(typeof closeConfirmation, 'function');
+    if (closeConfirmation) {
+      await act(async () => closeConfirmation());
+      assert.equal(button('Yes, Submit'), undefined);
+      assert.equal(calls, 0);
+      assert.equal(container.querySelector('#validation-remarks').value, 'Fix it');
+      await act(async () => form.requestSubmit());
+      await act(async () => button(result === 'Validated' ? 'Confirm Validation' : 'Confirm Return').click());
+    }
+    const finalButton = button('Yes, Submit');
+    await act(async () => { finalButton.click(); finalButton.click(); });
     assert.equal(calls, 1);
+    assert.deepEqual(args, ['p', result, 'Fix it', 2001]);
+    assert.equal(finalButton.disabled, true);
+    assert.equal(button('Go Back').disabled, true);
     await act(async () => finishSave(false));
-    assert.equal(button.disabled, false);
-    assert.equal(button.textContent, result === 'Validated' ? 'Submit' : 'Save');
+    assert.match(container.querySelector('[role="alert"]').textContent, /not saved/);
+    assert.equal(button('Yes, Submit').disabled, false);
+    await act(async () => button('Yes, Submit').click());
+    await act(async () => finishSave(true));
+    assert.equal(button('Yes, Submit'), undefined);
+    assert.equal(calls, 2);
   }
 });
 
