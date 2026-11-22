@@ -221,7 +221,7 @@ export function AIPredictionModule({
 
           {/* Footer */}
           <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-500 text-center">
-            Recommendations are generated automatically for new or updated eligible inspections.
+            Engineers can review and oversee the recommended maintenance activities.
           </div>
         </>
       )}
