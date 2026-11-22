@@ -1074,3 +1074,22 @@ test('AI generation uses latest eligible inspection dates and stores the inspect
     assert.equal(saved[0].inspectionFingerprint,requestBody.items[0].inspectionFingerprint);
   } finally {global.fetch=previousFetch;await reset();}
 });
+
+test('maintenance shows each eligible annual inspection and schedules the selected follow-up', async () => {
+  const Dummy=({children})=>React.createElement(React.Fragment,null,children);
+  const ui=new Proxy({}, {get:()=>Dummy});
+  const select={Select:Dummy,SelectTrigger:Dummy,SelectValue:()=>null,SelectContent:Dummy,SelectItem:({children})=>React.createElement('span',null,children)};
+  const {MaintenanceModule}=loadTs('src/app/components/MaintenanceModule.tsx',{'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts'),'@/lib/project-form-validation':validation,'./ui/textarea':{AutoGrowTextarea:props=>React.createElement('textarea',props)},'./ui/dialog':ui,'./ui/select':select,'./ConfirmActionDialog':ui,'./PrintDocument':ui,'@/lib/activity-log-client':{recordClientActivity:async()=>{}}});
+  const road={id:'p',name:'Road'};
+  const inspections=[{id:'old',localRoadId:'p',date:'2024-11-11',annualFollowUpYear:2024,conditionRatings:{Concrete:'Fair'}},{id:'new',localRoadId:'p',date:'2025-11-11',annualFollowUpYear:2025,conditionRatings:{Concrete:'Bad'}},{id:'good',localRoadId:'p',date:'2026-11-11',annualFollowUpYear:2026,conditionRatings:{Concrete:'Good'}},{id:'pending',localRoadId:'p',date:'2027-11-11',annualFollowUpYear:2027,conditionRatings:{Concrete:'Poor'},isScheduledAnnualFollowUp:true}];
+  const props={maintenanceRecords:[],scheduledInspectionIds:[],localRoadList:[road],inspections,userRole:'Staff - Encoder',currentUser:'User',onAddMaintenance(){},onEditMaintenance(){},onDeleteMaintenance(){},onUpdateStatus(){}};
+  await reset(); await act(async()=>root.render(React.createElement(MaintenanceModule,props)));
+  const section=container.querySelector('[aria-label="Inspections available for maintenance"]');
+  assert.match(section.textContent,/Annual follow-up 2024/); assert.match(section.textContent,/Annual follow-up 2025/);assert.doesNotMatch(section.textContent,/Annual follow-up 2026|Annual follow-up 2027/);
+  await act(async()=>section.querySelector('[aria-label="Schedule maintenance for Road, Annual follow-up 2024"]').click());
+  const input=document.querySelector('#maintenance-inspection');assert.equal(input.value,'old');
+  assert.match(input.textContent,/Follow-up 2024/);assert.match(input.textContent,/Follow-up 2025/);
+  await act(async()=>root.render(React.createElement(MaintenanceModule,{...props,maintenanceRecords:[{id:'m',localRoadId:'p',localRoadName:'Road',inspectionId:'old',scheduledDate:'2024-12-01',type:'Repair',status:'Scheduled',cost:0,description:'Repair'}]})));
+  const updated=container.querySelector('[aria-label="Inspections available for maintenance"]');assert.doesNotMatch(updated.textContent,/Annual follow-up 2024/);assert.match(updated.textContent,/Annual follow-up 2025/);
+  await reset();
+});

@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Show eligible annual follow-ups in inspection and maintenance
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `tests/inspection-selection.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Refresh assigned inspection data when opening the module and list each eligible historical inspection for maintenance scheduling while preserving the validated-year and assigned-inspector gates.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-17 — [mine] Remove validated badge from Head Engineer project list
 - **Type:** Modified
 - **Files:** `src/app/components/LocalRoadList.tsx` (modified), `tests/validation-workflow.test.cjs` (modified)

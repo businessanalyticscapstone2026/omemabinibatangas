@@ -407,6 +407,29 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
         </div>
       </section>
 
+      {eligibleInspections.length > 0 && <section aria-label="Inspections available for maintenance" className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-800">Inspections available for maintenance</h2>
+        <p className="mt-1 text-sm text-slate-500">Completed inspections with Fair, Poor, or Bad findings that have not yet been scheduled.</p>
+        <ul className="mt-3 divide-y divide-slate-100">
+          {eligibleInspections.map(inspection => {
+            const road = localRoadList.find(item => item.id === inspection.localRoadId);
+            if (!road) return null;
+            const name = road.projectName || road.name || inspection.localRoadName || 'Project';
+            const label = inspection.annualFollowUpYear ? `Annual follow-up ${inspection.annualFollowUpYear}` : 'Inspection';
+            return <li key={inspection.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div><p className="font-medium text-blue-700">{name}</p><p className="text-sm text-slate-600">{label} · {inspection.date}</p></div>
+              {!isAdminReadDeleteOnly && <button type="button" aria-label={`Schedule maintenance for ${name}, ${label}`} onClick={() => {
+                resetForm();
+                handleProjectSelection(inspection.localRoadId);
+                setSelectedInspectionId(inspection.id);
+                setActiveFormTab('project');
+                setShowForm(true);
+              }} className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">Schedule</button>}
+            </li>;
+          })}
+        </ul>
+      </section>}
+
       {showForm && typeof document !== 'undefined' && createPortal(
         <div className="module-form-backdrop fixed inset-0 z-[9999] flex min-h-screen items-center justify-center overflow-y-auto bg-slate-950/55 p-4 backdrop-blur-md">
           <div className="module-form-panel relative z-[10000] flex h-[min(560px,calc(100vh-48px))] min-h-0 w-full max-w-[840px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
@@ -520,7 +543,7 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
               <section ref={activitySectionRef} className="scroll-mt-4 pt-5">
                 <h3 className="text-[1.05rem] font-bold mb-3 text-gray-900">Maintenance Activity Information</h3>
 
-                {!editingRecordId && projectInspections.length > 1 && <div className="mb-3">
+                {!editingRecordId && projectInspections.length > 0 && <div className="mb-3">
                   <label htmlFor="maintenance-inspection" className="block text-xs font-medium text-gray-700 mb-1">Inspection record</label>
                   <select id="maintenance-inspection" className="w-full rounded-sm border border-gray-300 bg-white p-2" value={linkedInspectionId || ''} onChange={event => setSelectedInspectionId(event.target.value)}>
                     {projectInspections.map(item => <option key={item.id} value={item.id}>{item.date}{item.annualFollowUpYear ? ` (Follow-up ${item.annualFollowUpYear})` : ''}</option>)}
