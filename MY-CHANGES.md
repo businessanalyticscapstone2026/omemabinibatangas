@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Update validation history, date rules, and singleton staff roles
+- **Type:** Modified
+- **Files:** `src/app/api/auth/status/route.ts` (modified), `src/app/api/local-road/annual-validation/route.ts` (modified), `src/app/api/local-road/route.ts` (modified), `src/app/components/LocalRoadForm.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `src/app/components/UserManagementModule.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `tests/password-boundaries.test.cjs` (modified), `tests/project-form.test.cjs` (modified), `tests/single-head-engineer.test.cjs` (modified), `tests/validation-workflow.test.cjs` (modified), `supabase/migrations/20261122_singleton_staff_roles.sql` (new)
+- **What & why:** Show independent annual validation records and protect pending first anniversaries, enforce chronological form dates, simplify maintenance and restrict non-inspector roles to one current account.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Verify historical follow-up workflow independently by year
 - **Type:** Docs
 - **Files:** `tests/inspector-assignment.test.cjs` (modified)

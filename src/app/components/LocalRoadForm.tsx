@@ -192,6 +192,12 @@ export function LocalRoadForm({ item, editId, onSave, onClose }: LocalRoadFormPr
       ['Actual Completion Date', formData.actualCompletionDate],
       ['Turnover and Acceptance Date', formData.turnoverDate],
     ].find(([, value]) => !hasFourDigitYear(value));
+    if (formData.actualCompletionDate && formData.turnoverDate && formData.turnoverDate < formData.actualCompletionDate) {
+      const input = e.currentTarget.querySelector<HTMLInputElement>('[data-field="Turnover and Acceptance Date"]');
+      input?.setCustomValidity('Please fill out valid date.');
+      input?.reportValidity();
+      return;
+    }
     const invalidCurrency = [
       ['Approved Budget for the Contract (ABC)', formData.appropriation], ['Contracted Amount', formData.contractedAmount],
     ].find(([, value]) => !isValidProjectCurrency(value));
@@ -398,6 +404,9 @@ export function LocalRoadForm({ item, editId, onSave, onClose }: LocalRoadFormPr
           }}
           onInputCapture={(event) => {
             const field = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+            if (field instanceof HTMLInputElement && field.dataset.field === 'Actual Completion Date') {
+              event.currentTarget.querySelector<HTMLInputElement>('[data-field="Turnover and Acceptance Date"]')?.setCustomValidity('');
+            }
             if (!('setCustomValidity' in field)) return;
             const textField = field instanceof HTMLTextAreaElement || (field instanceof HTMLInputElement && field.type === 'text');
             field.setCustomValidity(field.required && textField && field.value && !field.value.trim()
@@ -781,7 +790,7 @@ export function LocalRoadForm({ item, editId, onSave, onClose }: LocalRoadFormPr
                 </label>
                 <input
                   type="date"
-                  min="2000-01-01"
+                  min={formData.actualCompletionDate || "2000-01-01"}
                   max="9999-12-31"
                   data-field="Turnover and Acceptance Date"
                   value={formData.turnoverDate}

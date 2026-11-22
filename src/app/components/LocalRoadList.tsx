@@ -246,8 +246,8 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
 
   // Sort individual entries rather than projects, so the most recent year is first.
   const validationRows = filteredData.flatMap(item => [
-    ...(item.annualValidationEntries || []).filter(entry => entry.result !== 'Validated').map(entry => ({ item, entry, year: entry.year as number | null })),
-    ...(item.validationResult === 'Return for Revision' ? [{ item, entry: { result: item.validationResult, remarks: item.validationRemarks || '' }, year: null }] : []),
+    ...(item.annualValidationEntries || []).map(entry => ({ item, entry, year: entry.year as number | null })),
+    ...(item.validationResult ? [{ item, entry: { result: item.validationResult, remarks: item.validationRemarks || '' }, year: null }] : []),
   ]).filter(({ item, entry, year }) => {
     const query = searchTerm.trim().toLowerCase();
     return [item.projectName || item.name, entry.result, year == null ? 'Initial validation' : `Annual ${year}`, item.barangay || 'N/A', item.dateBuilt, item.condition, item.lastInspection || 'N/A'].some(value => String(value ?? '').toLowerCase().includes(query));
@@ -499,7 +499,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
               <p className="mb-2 text-sm font-medium text-gray-700">Last Inspection</p>
               <p className="min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-gray-700">{selectedItem.lastInspection || ''}</p>
             </div>
-            <div>
+            {!validationMode && <><div>
               <p className="mb-2 text-sm font-medium text-gray-700">Validation Result</p>
               <p className="min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-gray-700">{latestValidation(selectedItem).result && latestValidation(selectedItem).result !== 'Pending' ? latestValidation(selectedItem).result : 'Pending Validation'}</p>
             </div>
@@ -508,7 +508,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
               <p className="min-h-[5rem] whitespace-pre-wrap rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-gray-700">
                 {latestValidation(selectedItem).remarks || ''}
               </p>
-            </div>
+            </div></>}
             </div>
             {canPrint && !validationMode && (
               <div className="mt-5 flex justify-end border-t border-slate-200 pt-5">
@@ -789,14 +789,14 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{item.dateBuilt}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{item.condition}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{item.lastInspection || 'N/A'}</td>
-                    <td className="px-2 py-4 text-center">{onDeleteValidation && year != null && canRemoveAnnualValidation(item, year) && <button type="button" aria-label={`Remove annual validation ${year} for ${item.projectName || item.name}`} title="Remove annual validation" onClick={event => { event.stopPropagation(); setPendingValidationDelete({ item, year }); }} className="rounded-md p-2 text-slate-500 hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>}</td>
+                    <td className="px-2 py-4 text-center">{onDeleteValidation && year != null && canRemoveAnnualValidation(item, year, entry.result) && <button type="button" aria-label={`Remove annual validation ${year} for ${item.projectName || item.name}`} title="Remove annual validation" onClick={event => { event.stopPropagation(); setPendingValidationDelete({ item, year }); }} className="rounded-md p-2 text-slate-500 hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>}</td>
                   </tr>
                   );
                 })}
               </tbody>
             </table>
             {validationRows.length === 0 && (
-              <div className="py-12 text-center text-gray-500">No pending or returned validations found.</div>
+              <div className="py-12 text-center text-gray-500">No validations found.</div>
             )}
           </div>
         ) : (

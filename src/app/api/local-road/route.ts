@@ -96,6 +96,7 @@ export async function POST(request: Request) {
   if (['dateStarted', 'dateBuilt', 'targetCompletionDate', 'actualCompletionDate', 'turnoverDate'].some(key => payload[key] && (typeof payload[key] !== 'string' || !hasFourDigitYear(payload[key] as string)))) {
     return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
   }
+  if (typeof payload.actualCompletionDate === 'string' && typeof payload.turnoverDate === 'string' && payload.actualCompletionDate && payload.turnoverDate && payload.turnoverDate < payload.actualCompletionDate) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
   // @mine — task 12: at most five coverage locations, each up to 500 characters.
   const postLocationsError = projectLocationsError(payload.locations);
   if (postLocationsError) return NextResponse.json({ message: postLocationsError }, { status: 400 });
@@ -138,6 +139,12 @@ export async function PATCH(request: Request) {
     const roads = await listRoads(auth.db, auth.admin);
     const current = roads.find((road) => road.id === payload.id);
     if (!current) return NextResponse.json({ message: 'Road not found.' }, { status: 404 });
+
+    if (auth.profile.roleDb === 'encoder') {
+      const completion = payload.actualCompletionDate ?? current.actualCompletionDate;
+      const turnover = payload.turnoverDate ?? current.turnoverDate;
+      if (typeof completion === 'string' && typeof turnover === 'string' && completion && turnover && turnover < completion) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
+    }
 
     const project = current as unknown as ValidationProject;
     // @mine — multiple outstanding returned annual decisions may exist; requeue each one

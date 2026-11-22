@@ -15,7 +15,7 @@ const response = { NextResponse: { json: (body, init) => ({body, status:init?.st
 const request = body => ({ json: async () => body });
 let written = [];
 const admin = {
-  from: () => ({select: () => ({eq: () => ({maybeSingle: async () => ({data:null})})}), update: () => ({eq: () => ({select: () => ({single: async () => ({data:{},error:null})})})})}),
+  from: () => ({select: () => ({eq: () => ({maybeSingle: async () => ({data:null}), is: () => ({limit: async () => ({data:[], error:null})})})}), update: () => ({eq: () => ({select: () => ({single: async () => ({data:{},error:null})})})})}),
   auth: { admin: {createUser: async ({password}) => {written.push(password); return {data:{user:{id:'u'}}};}, updateUserById: async (_id,{password}) => {written.push(password); return {error:null};} } },
 };
 const api = {requireRole:async()=>({auth:{admin,userId:'head',profile:{username:'head'}}}),withRefresh:x=>x};
