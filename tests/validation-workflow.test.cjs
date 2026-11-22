@@ -289,22 +289,22 @@ test('returned project ignores derived aliases and currency formatting but accep
   assert.equal((await patch({ locations: ['A', 'B'] })).status, 200);
 });
 
-test('validation table hides validated years but retains pending and returned years newest first', () => {
+test('validation table shows validated, pending and returned years newest first', () => {
   const Dummy = ({children}) => React.createElement(React.Fragment,null,children);
   const ui = new Proxy({}, {get: () => Dummy});
   const Component = load('src/app/components/LocalRoadList.tsx', {'./ui/textarea':ui,'./ui/dialog':ui,'./ui/select':ui,'./ConfirmActionDialog':ui,'./PrintDocument':ui,'@/lib/activity-log-client':{recordClientActivity(){}},'@/lib/project-validation-workflow':workflow,'@/lib/project-form-validation':load('src/lib/project-form-validation.ts')}).LocalRoadList;
   const road={id:'p',name:'Road',actualCompletionDate:'2023-11-11',annualValidationEntries:[entry(2024,'Validated','Done'),entry(2025,'Return for Revision','Fix'),entry(2026)]};
   const props={userRole:'Staff - Validator',validationMode:true,currentUser:'User',onAdd(){},onEdit(){},onDelete(){},onDeleteValidation(){}};
   const html=renderToStaticMarkup(React.createElement(Component,{...props,data:[road]}));
-  assert.doesNotMatch(html,/Annual 2024/);
+  assert.match(html,/Validated · Annual 2024/);
   assert.match(html,/Return for Revision · Annual 2025/); assert.match(html,/Pending · Annual 2026/);
   assert.ok(html.indexOf('Annual 2026') < html.indexOf('Annual 2025'));
   for (const year of [2025,2026]) assert.match(html,new RegExp(`Remove annual validation ${year} for Road`));
-  assert.match(html,/2 records listed/);
+  assert.match(html,/3 records listed/);
   const legacy=renderToStaticMarkup(React.createElement(Component,{...props,data:[{id:'legacy',name:'Older',validationResult:'Validated',annualValidationEntries:[]}]}));
-  assert.doesNotMatch(legacy,/Validated · Initial validation/); assert.match(legacy,/No pending or returned validations found/);
+  assert.match(legacy,/Validated · Initial validation/);
   const complete=renderToStaticMarkup(React.createElement(Component,{...props,data:[{...road,annualValidationEntries:[entry(2024,'Validated'),entry(2025,'Validated'),entry(2026,'Validated')]}]}));
-  assert.doesNotMatch(complete,/Annual 202[456]/); assert.match(complete,/No pending or returned validations found/);
+  for (const year of [2024,2025,2026]) assert.match(complete,new RegExp(`Validated · Annual ${year}`));
 });
 
 test('legacy and past validated projects remain locked through pending years until returned', () => {
@@ -315,9 +315,9 @@ test('legacy and past validated projects remain locked through pending years unt
 });
 
 test('removal targets only one annual validation, requires validator access and keeps the tombstone', async () => {
-  let currentRole='validator', updates=[], logs=[];
+  let currentRole='validator', updates=[], logs=[], firstApproved=false;
   const res=(status,body={})=>({status,body});
-  const db={from(table){ assert.equal(table,'annual_validation_entries'); const chain={update(value){updates.push({value,filters:[]});return chain;},eq(key,value){updates.at(-1).filters.push([key,value]);return chain;},is(key,value){updates.at(-1).filters.push([key,value]);return chain;},select(){return chain;},maybeSingle:async()=>({data:{id:'row'},error:null})};return chain;}};
+  const db={from(table){ assert.equal(table,'annual_validation_entries'); const chain={update(value){updates.push({value,filters:[]});return chain;},eq(key,value){updates.at(-1).filters.push([key,value]);return chain;},is(key,value){updates.at(-1).filters.push([key,value]);return chain;},select(){return chain;},maybeSingle:async()=>({data:updates.at(-1).filters.some(([k,v])=>k==='result' && v==='approved') && !firstApproved ? null : {id:'row'},error:null})};return chain;}};
   const route=load('src/app/api/local-road/annual-validation/route.ts',{
     'next/server':{NextResponse:{json:(body,init)=>res(init?.status||200,body)}},
     '@/lib/api':{requireRole:async (_request,roles)=>roles.includes(currentRole)?{auth:{admin:db,db:{from:()=>({select(){return this},eq(){return this},is(){return this},maybeSingle:async()=>({data:{actual_completion_date:'2023-11-11'},error:null})})},userId:'u',profile:{username:'validator'}}}:{denied:res(403)},withRefresh:r=>r},
@@ -326,12 +326,14 @@ test('removal targets only one annual validation, requires validator access and 
   });
   const request=body=>({json:async()=>body});
   assert.equal((await route.DELETE(request({projectId:'p',year:2024}))).status,403);
+  firstApproved=true; assert.equal((await route.DELETE(request({projectId:'p',year:2024}))).status,200);
+  assert.deepEqual(updates[1].filters,[['project_id','p'],['year',2024],['deleted_at',null],['result','approved']]);
   assert.equal((await route.DELETE(request({projectId:'p',year:2025}))).status,200);
-  assert.deepEqual(updates[0].filters,[['project_id','p'],['year',2025],['deleted_at',null]]);
-  assert.ok(updates[0].value.deleted_at); assert.match(logs[0].details,/2025/);
+  assert.deepEqual(updates[2].filters,[['project_id','p'],['year',2025],['deleted_at',null]]);
+  assert.ok(updates[2].value.deleted_at); assert.match(logs[1].details,/2025/);
   currentRole='encoder'; assert.equal((await route.DELETE(request({projectId:'p',year:2024}))).status,403);
   currentRole='validator'; assert.equal((await route.DELETE(request({projectId:'p',year:'2024'}))).status,400);
-  assert.equal(updates.length,1);
+  assert.equal(updates.length,3);
 });
 
 test('annual generator makes all due years and does not recreate a removed year', async () => {
@@ -341,4 +343,12 @@ test('annual generator makes all due years and does not recreate a removed year'
   try {global.Date=MockDate;await dm.ensureAnnualFollowUps(db);} finally {global.Date=RealDate;}
   assert.deepEqual(writes.filter(w=>w.table==='annual_validation_entries').map(w=>w.value.year),[2024,2026]);
   assert.deepEqual(writes.filter(w=>w.table==='inspections').map(w=>w.value.annual_follow_up_year),[2024,2025,2026]);
+});
+
+test('an approved follow-up appears as soon as validated on the first window day', async () => {
+  const dm=load('src/lib/supabase-data.ts',{'@/lib/attachment-validation':load('src/lib/attachment-validation.ts'),'@/lib/project-form-validation':load('src/lib/project-form-validation.ts'),'@/lib/supabase':{ROLE_FROM_DB:{},ROLE_TO_DB:{}}});
+  const RealDate=global.Date; class MockDate extends RealDate {constructor(...args){super(...(args.length?args:['2027-10-12T12:00:00Z']));} static now(){return new RealDate('2027-10-12T12:00:00Z').getTime();}}
+  const writes=[];const db={from(table){const chain={select(){return chain;},is(){return chain;},not(){return chain;},eq(){return chain;},upsert(value){writes.push({table,value});return Promise.resolve({error:null});},insert(value){writes.push({table,value});return Promise.resolve({error:null});},then(resolve,reject){const data=table==='projects'?[{id:'p',actual_completion_date:'2026-11-11'}]:table==='annual_validation_entries'?[{year:2027,result:'approved',deleted_at:null}]:[];return Promise.resolve({data,error:null}).then(resolve,reject);}};return chain;}};
+  try {global.Date=MockDate;await dm.ensureAnnualFollowUps(db);} finally {global.Date=RealDate;}
+  const inspection=writes.find(w=>w.table==='inspections');assert.equal(inspection.value.annual_follow_up_year,2027);assert.equal(inspection.value.inspection_date,'2027-10-13');
 });

@@ -520,7 +520,7 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
               <section ref={activitySectionRef} className="scroll-mt-4 pt-5">
                 <h3 className="text-[1.05rem] font-bold mb-3 text-gray-900">Maintenance Activity Information</h3>
 
-                {!editingRecordId && projectInspections.length > 1 && <div className="mb-3">
+                {!editingRecordId && projectInspections.length > 0 && <div className="mb-3">
                   <label htmlFor="maintenance-inspection" className="block text-xs font-medium text-gray-700 mb-1">Inspection record</label>
                   <select id="maintenance-inspection" className="w-full rounded-sm border border-gray-300 bg-white p-2" value={linkedInspectionId || ''} onChange={event => setSelectedInspectionId(event.target.value)}>
                     {projectInspections.map(item => <option key={item.id} value={item.id}>{item.date}{item.annualFollowUpYear ? ` (Follow-up ${item.annualFollowUpYear})` : ''}</option>)}

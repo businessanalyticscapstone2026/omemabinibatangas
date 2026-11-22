@@ -13,8 +13,8 @@ const HEAD = ['head_engineer'];
 const HEAD_EXISTS = 'Only one current Head Engineer account is allowed.';
 
 // Applies to non-archived profiles, even if an account is inactive.
-async function anotherHeadExists(admin: any, exceptId?: string): Promise<boolean> {
-  let query = admin.from('profiles').select('id').eq('role', 'head_engineer').is('archived_at', null);
+async function anotherHeadExists(admin: any, exceptId?: string, role = 'head_engineer'): Promise<boolean> {
+  let query = admin.from('profiles').select('id').eq('role', role).is('archived_at', null);
   if (exceptId) query = query.neq('id', exceptId);
   const { data, error } = await query.limit(1);
   if (error) throw error;
@@ -23,7 +23,7 @@ async function anotherHeadExists(admin: any, exceptId?: string): Promise<boolean
 
 function isHeadConstraintError(error: unknown): boolean {
   const value = error as { code?: string; message?: string; details?: string } | null;
-  return value?.code === '23505' && `${value.message ?? ''} ${value.details ?? ''}`.includes('profiles_one_current_head_engineer');
+  return value?.code === '23505' && `${value.message ?? ''} ${value.details ?? ''}`.includes('profiles_one_current_head_engineer') || (value?.code === '23505' && `${value.message ?? ''} ${value.details ?? ''}`.includes('profiles_one_current_singleton_role'));
 }
 
 
@@ -66,12 +66,12 @@ export async function POST(request: Request) {
   if (!dbRole) {
     return NextResponse.json({ message: `Unknown role: ${String(role)}.` }, { status: 400 });
   }
-  if (dbRole === 'head_engineer') {
-    try { if (await anotherHeadExists(auth.admin)) return NextResponse.json({ message: HEAD_EXISTS }, { status: 409 }); }
-    catch { return NextResponse.json({ message: 'Unable to verify Head Engineer accounts.' }, { status: 500 }); }
-  }
   const cred = String(password ?? '');
   if (cred.length < 8 || cred.length > 64) return NextResponse.json({ message: 'Password must be between 8 and 64 characters.' }, { status: 400 });
+  if (dbRole !== 'inspector') {
+    try { if (await anotherHeadExists(auth.admin, undefined, dbRole)) return NextResponse.json({ message: dbRole === 'head_engineer' ? HEAD_EXISTS : 'Only one current account is allowed for this role.' }, { status: 409 }); }
+    catch { return NextResponse.json({ message: 'Unable to verify existing accounts.' }, { status: 500 }); }
+  }
   // @mine — the handle follows the displayed name (no more e-mail-prefix handles).
   const cleanUsername = deriveUsername(name);
   if (!cleanUsername) {
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
           if (cleanupError) console.error('Unable to clean up the rejected account.', cleanupError);
         } catch (cleanupError) { console.error('Unable to clean up the rejected account.', cleanupError); }
       }
-      return NextResponse.json({ message: HEAD_EXISTS }, { status: 409 });
+      return NextResponse.json({ message: 'Only one current account is allowed for this role.' }, { status: 409 });
     }
     const message = error instanceof Error && /already|exists|registered/i.test(error.message)
       ? 'That email or username is already registered.'
@@ -170,7 +170,7 @@ export async function PATCH(request: Request) {
         .maybeSingle();
       if (currentError) throw currentError;
       if (!current) return NextResponse.json({ message: 'User not found.' }, { status: 404 });
-      if (dbRole === 'head_engineer' && await anotherHeadExists(auth.admin, userId)) return NextResponse.json({ message: HEAD_EXISTS }, { status: 409 });
+      if (dbRole !== 'inspector' && await anotherHeadExists(auth.admin, userId, dbRole)) return NextResponse.json({ message: dbRole === 'head_engineer' ? HEAD_EXISTS : 'Only one current account is allowed for this role.' }, { status: 409 });
 
       // @mine — a Head Engineer demoting themselves would leave the system with no
       // one able to administer users (the master code does not grant roles).
@@ -238,7 +238,7 @@ export async function PATCH(request: Request) {
     if (!count) return NextResponse.json({ message: 'User not found.' }, { status: 404 });
     return withRefresh(NextResponse.json({ success: true, status }), auth);
   } catch (error) {
-    if (isHeadConstraintError(error)) return NextResponse.json({ message: HEAD_EXISTS }, { status: 409 });
+    if (isHeadConstraintError(error)) return NextResponse.json({ message: 'Only one current account is allowed for this role.' }, { status: 409 });
     const message = error instanceof Error && /unique|duplicate/i.test(error.message)
       ? 'That email or username is already registered.'
       : 'Unable to update the user account.';
@@ -256,14 +256,14 @@ export async function PUT(request: Request) {
   if (action === 'restore') {
     const { data: profile, error: profileError } = await auth.admin.from('profiles').select('role').eq('id', userId).maybeSingle();
     if (profileError) return NextResponse.json({ message: 'Unable to verify this user.' }, { status: 500 });
-    try { if (profile?.role === 'head_engineer' && await anotherHeadExists(auth.admin, userId)) return NextResponse.json({ message: HEAD_EXISTS }, { status: 409 }); }
+    try { if (profile?.role && profile.role !== 'inspector' && await anotherHeadExists(auth.admin, userId, profile.role)) return NextResponse.json({ message: profile.role === 'head_engineer' ? HEAD_EXISTS : 'Only one current account is allowed for this role.' }, { status: 409 }); }
     catch { return NextResponse.json({ message: 'Unable to verify Head Engineer accounts.' }, { status: 500 }); }
   }
   const { error, count } = await auth.admin
     .from('profiles')
     .update({ archived_at: action === 'archive' ? new Date().toISOString() : null }, { count: 'exact' })
     .eq('id', userId);
-  if (isHeadConstraintError(error)) return NextResponse.json({ message: HEAD_EXISTS }, { status: 409 });
+  if (isHeadConstraintError(error)) return NextResponse.json({ message: 'Only one current account is allowed for this role.' }, { status: 409 });
   if (error) return NextResponse.json({ message: 'Unable to change this user.' }, { status: 500 });
   if (!count) return NextResponse.json({ message: 'User not found.' }, { status: 404 });
   return withRefresh(NextResponse.json({ success: true }), auth);

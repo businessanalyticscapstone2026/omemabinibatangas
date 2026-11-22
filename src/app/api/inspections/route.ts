@@ -36,7 +36,7 @@ export const dynamic = 'force-dynamic';
 
 async function refreshRoadCondition(auth: Awaited<ReturnType<typeof requireAuth>>, roadId: string) {
   if (!auth) return null;
-  const road = (await listRoads(auth.db)).find((item) => item.id === roadId);
+  const road = (await listRoads(auth.db, auth.admin)).find((item) => item.id === roadId);
   if (!road) return null;
   const latest = (await listInspections(auth.db))
     .filter((i) => i.localRoadId === roadId)
@@ -63,12 +63,12 @@ export async function GET(request: Request) {
     // @mine — step 5 (WORKFLOW-DECISIONS Q8/Q9): an inspector only sees the projects
     // assigned to them; every other role keeps the full list.
     if (auth.profile.roleDb === 'inspector') {
-      const roads = await listRoads(auth.db);
+      const roads = await listRoads(auth.db, auth.admin);
       const mine = new Set(roads.filter((road) => road.inspectorId === auth.userId).map((road) => road.id));
       return withRefresh(NextResponse.json({
         data: data.filter((inspection) => mine.has(String(inspection.localRoadId))),
         archived: archived.filter((inspection) => mine.has(String(inspection.localRoadId))),
-      }), auth);
+      }, { headers: { 'Cache-Control': 'private, no-store' } }), auth);
     }
     return withRefresh(NextResponse.json({ data, archived }), auth);
   } catch (error) {
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Select an inspection type and complete every assessment, including remarks and attachments for Fair, Poor, and Bad components.' }, { status: 400 });
   }
   payload.remarks = findingsSummary(ratings, remarks);
-  const road = (await listRoads(auth.db)).find((item) => item.id === payload.localRoadId);
+  const road = (await listRoads(auth.db, auth.admin)).find((item) => item.id === payload.localRoadId);
   if (!road) return NextResponse.json({ message: 'Road not found.' }, { status: 404 });
   if (notAssignedToInspector(auth, road)) {
     return NextResponse.json({ message: 'This project is not assigned to you.' }, { status: 403 });
@@ -165,7 +165,7 @@ export async function PUT(request: Request) {
   payload.remarks = findingsSummary(ratings, remarks);
   const existing = (await listInspections(auth.db)).find((item) => item.id === payload.id);
   if (!existing) return NextResponse.json({ message: 'Inspection not found.' }, { status: 404 });
-  const road = (await listRoads(auth.db)).find((item) => item.id === payload.localRoadId);
+  const road = (await listRoads(auth.db, auth.admin)).find((item) => item.id === payload.localRoadId);
   if (!road) return NextResponse.json({ message: 'Road not found.' }, { status: 404 });
   if (notAssignedToInspector(auth, road)) {
     return NextResponse.json({ message: 'This project is not assigned to you.' }, { status: 403 });

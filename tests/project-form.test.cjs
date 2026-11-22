@@ -468,7 +468,7 @@ test('new projects save without optional ID and contact and copy actual completi
   assert.equal(field('Road Network ID No.').required, false);
   assert.equal(field('Contact Information').required, false);
   assert.equal(field('Completion Date').disabled, true);
-  await change('Actual Completion Date', '2027-04-05');
+  await change('Actual Completion Date', '2027-04-05'); await change('Turnover and Acceptance Date', '2027-04-05');
   assert.equal(field('Completion Date').value, '2027-04-05');
   assert.equal(field('Actual Project Cost'), null);
   const row = field('Contracted Amount').parentElement.parentElement.parentElement;
@@ -486,7 +486,7 @@ test('editing shows and saves completion date from actual date even when old dat
     attachments: [{ name: 'old.pdf', type: 'application/pdf', category: 'Turnover Certificate', dataUrl: 'signed', storagePath: 'old/path' }] };
   await reset(); await render(value => { saved = value; }, { item, editId: 'p1' });
   assert.equal(field('Completion Date').value, '2026-03-01');
-  await fill(); await change('Actual Completion Date', '2028-06-07');
+  await fill(); await change('Actual Completion Date', '2028-06-07'); await change('Turnover and Acceptance Date', '2028-06-08');
   assert.equal(field('Completion Date').value, '2028-06-07');
   await submit(); assert.equal(saved.completionDate, '2028-06-07');
 });
@@ -588,8 +588,7 @@ test('validator reopens an updated returned project with an empty remarks input'
   await act(async () => container.querySelector('[aria-label="Open validation for Road 2001"]').click());
   assert.equal(container.querySelector('#validation-remarks').value, '');
   const detail = container.querySelector('.project-details-dialog');
-  const label = [...detail.querySelectorAll('p')].find(el => el.textContent === 'Validation Result');
-  assert.equal(label.nextElementSibling.textContent, 'Pending Validation');
+  assert.match(detail.textContent, /Annual Follow-up 2001Pending/);
   assert.match(detail.textContent, /Previous revision remarks/); // History remains visible separately.
 });
 
@@ -1108,4 +1107,32 @@ test('AI generation uses latest eligible inspection dates and stores the inspect
     assert.ok(requestBody.items[0].inspectionFingerprint.includes('Crack'));
     assert.equal(saved[0].inspectionFingerprint,requestBody.items[0].inspectionFingerprint);
   } finally {global.fetch=previousFetch;await reset();}
+});
+
+test('maintenance does not show a separate available-inspections card', async () => {
+  const Dummy=({children})=>React.createElement(React.Fragment,null,children);
+  const ui=new Proxy({}, {get:()=>Dummy});
+  const {MaintenanceModule}=loadTs('src/app/components/MaintenanceModule.tsx',{'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts'),'@/lib/project-form-validation':validation,'./ui/textarea':ui,'./ui/dialog':ui,'./ui/select':ui,'./ConfirmActionDialog':ui,'./PrintDocument':ui,'@/lib/activity-log-client':{recordClientActivity:async()=>{}}});
+  await reset(); await act(async()=>root.render(React.createElement(MaintenanceModule,{maintenanceRecords:[],scheduledInspectionIds:[],localRoadList:[{id:'p',name:'Road'}],inspections:[{id:'old',localRoadId:'p',date:'2024-11-11',annualFollowUpYear:2024,conditionRatings:{Concrete:'Fair'}}],userRole:'Staff - Encoder',currentUser:'User',onAddMaintenance(){},onEditMaintenance(){},onDeleteMaintenance(){},onUpdateStatus(){}})));
+  assert.equal(container.querySelector('[aria-label="Inspections available for maintenance"]'),null);
+  await reset();
+});
+
+test('turnover cannot precede actual completion and accepts the same day', async () => {
+  let saved; await reset(); await render(value=>{saved=value}); await fill(); await file();
+  await change('Actual Completion Date','2026-03-01');
+  const turnover=field('Turnover and Acceptance Date');
+  assert.equal(turnover.min,'2026-03-01');
+  await change('Turnover and Acceptance Date','2026-02-28'); await submit(); assert.equal(saved,undefined);
+  await change('Turnover and Acceptance Date','2026-03-01'); await submit(); assert.equal(saved.turnoverDate,'2026-03-01');
+});
+
+test('validator sees only selected follow-up remarks, not another year', async () => {
+  const Dummy=({children})=>React.createElement(React.Fragment,null,children); const ui=new Proxy({}, {get:()=>Dummy});
+  const {LocalRoadList}=loadTs('src/app/components/LocalRoadList.tsx',{'./ui/textarea':{AutoGrowTextarea:props=>React.createElement('textarea',props)},'./ui/dialog':{...ui,Dialog:Dummy,DialogContent:({children,className})=>React.createElement('div',{className},children),DialogTitle:Dummy,DialogDescription:Dummy},'./ui/select':ui,'./ConfirmActionDialog':ui,'./PrintDocument':ui,'@/lib/activity-log-client':{recordClientActivity:async()=>{}},'@/lib/project-validation-workflow':loadTs('src/lib/project-validation-workflow.ts'),'@/lib/project-form-validation':validation});
+  const road={id:'p',name:'Road',actualCompletionDate:'2023-01-01',annualValidationEntries:[{year:2024,result:'Return for Revision',remarks:'Other year only'},{year:2025,result:'Pending',remarks:''}]};
+  await reset(); await act(async()=>root.render(React.createElement(LocalRoadList,{data:[road],userRole:'Staff - Validator',validationMode:true,currentUser:'User',onAdd(){},onEdit(){},onDelete(){}})));
+  await act(async()=>container.querySelector('[aria-label="Open validation for Road 2025"]').click());
+  assert.doesNotMatch(container.querySelector('.project-details-dialog').textContent,/Other year only/);
+  await reset();
 });

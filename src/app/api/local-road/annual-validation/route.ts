@@ -20,12 +20,17 @@ export async function DELETE(request: Request) {
     const { data: project, error: projectError } = await auth.db.from('projects').select('actual_completion_date').eq('id', projectId).is('archived_at', null).maybeSingle();
     if (projectError) throw projectError;
     if (!project) return NextResponse.json({ message: 'Project not found.' }, { status: 404 });
-    if (!canRemoveAnnualValidation({ actualCompletionDate: project.actual_completion_date }, year)) return NextResponse.json({ message: 'The first anniversary validation cannot be removed.' }, { status: 403 });
-    const { data, error } = await auth.admin.from('annual_validation_entries')
+    const firstYear = Number(String(project.actual_completion_date || '').slice(0, 4)) + 1;
+    if (!canRemoveAnnualValidation({ actualCompletionDate: project.actual_completion_date }, year, year === firstYear ? 'Validated' : undefined)) return NextResponse.json({ message: 'Invalid anniversary year.' }, { status: 403 });
+    let query = auth.admin.from('annual_validation_entries')
       .update({ deleted_at: new Date().toISOString() }).eq('project_id', projectId).eq('year', year)
-      .is('deleted_at', null).select('id').maybeSingle();
+      .is('deleted_at', null);
+    // Check the stored decision atomically: the first anniversary cannot be
+    // removed if it is pending or returned, even if it changed after opening.
+    if (year === firstYear) query = query.eq('result', 'approved');
+    const { data, error } = await query.select('id').maybeSingle();
     if (error) throw error;
-    if (!data) return NextResponse.json({ message: 'Annual validation not found. Refresh and try again.' }, { status: 404 });
+    if (!data) return NextResponse.json({ message: year === firstYear ? 'Only a validated first-anniversary entry can be removed.' : 'Annual validation not found. Refresh and try again.' }, { status: year === firstYear ? 403 : 404 });
     await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Annual Validation Removed', details: `Removed annual validation ${year} for project ${projectId}` }).catch(error => console.error('Annual validation removed; activity logging failed.', error));
     return withRefresh(NextResponse.json({ success: true }), auth);
   } catch (error) {

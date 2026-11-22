@@ -129,3 +129,19 @@ test('inspection card follows the earliest validated pending annual year, preser
   roads[0].annualValidationEntries[1].result='Pending';
   assert.deepEqual(inspectionCardsByValidation([finished,newer],roads).map(i=>i.id),['2024']);
 });
+
+test('historical validated follow-ups advance in order and become independently eligible for maintenance', () => {
+  const {inspectionCardsByValidation,eligibleMaintenanceInspections}=load('src/lib/inspection-selection.ts');
+  const roads=[{id:'p',annualValidationEntries:[{year:2024,result:'Validated'},{year:2025,result:'Validated'},{year:2026,result:'Pending'}]}];
+  const pending=year=>({id:String(year),localRoadId:'p',date:`${year}-11-01`,annualFollowUpYear:year,isScheduledAnnualFollowUp:true});
+  let records=[pending(2024),pending(2025),pending(2026)];
+  assert.deepEqual(inspectionCardsByValidation(records,roads).map(i=>i.annualFollowUpYear),[2024]);
+  records[0]={...records[0],isScheduledAnnualFollowUp:false,conditionRatings:{Concrete:'Fair'}};
+  assert.deepEqual(inspectionCardsByValidation(records,roads).map(i=>i.annualFollowUpYear),[2025]);
+  assert.deepEqual(eligibleMaintenanceInspections(records,[]).map(i=>i.annualFollowUpYear),[2024]);
+  records[1]={...records[1],isScheduledAnnualFollowUp:false,conditionRatings:{Concrete:'Poor'}};
+  assert.deepEqual(eligibleMaintenanceInspections(records,[]).map(i=>i.annualFollowUpYear),[2025,2024]);
+  assert.deepEqual(eligibleMaintenanceInspections(records,['2024']).map(i=>i.annualFollowUpYear),[2025]);
+  roads[0].annualValidationEntries[2].result='Validated';
+  assert.deepEqual(inspectionCardsByValidation(records,roads).map(i=>i.annualFollowUpYear),[2026]);
+});

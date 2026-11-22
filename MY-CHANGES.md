@@ -78,6 +78,34 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Update validation history, date rules, and singleton staff roles
+- **Type:** Modified
+- **Files:** `src/app/api/auth/status/route.ts` (modified), `src/app/api/local-road/annual-validation/route.ts` (modified), `src/app/api/local-road/route.ts` (modified), `src/app/components/LocalRoadForm.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `src/app/components/UserManagementModule.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `tests/password-boundaries.test.cjs` (modified), `tests/project-form.test.cjs` (modified), `tests/single-head-engineer.test.cjs` (modified), `tests/validation-workflow.test.cjs` (modified), `supabase/migrations/20261122_singleton_staff_roles.sql` (new)
+- **What & why:** Show independent annual validation records and protect pending first anniversaries, enforce chronological form dates, simplify maintenance and restrict non-inspector roles to one current account.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Verify historical follow-up workflow independently by year
+- **Type:** Docs
+- **Files:** `tests/inspector-assignment.test.cjs` (modified)
+- **What & why:** Prevent later pending or returned annual decisions from blocking an earlier validated follow-up from inspection and eligible maintenance.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Show annual inspections immediately after validation
+- **Type:** Modified
+- **Files:** `src/lib/supabase-data.ts` (modified), `tests/validation-workflow.test.cjs` (modified)
+- **What & why:** A follow-up validated on the first day of its window should appear without waiting for the inspection window; the minimum inspection date is unchanged.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Show eligible annual follow-ups in inspection and maintenance
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `tests/inspection-selection.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Refresh assigned inspection data when opening the module and list each eligible historical inspection for maintenance scheduling while preserving the validated-year and assigned-inspector gates.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-17 — [mine] Remove validated badge from Head Engineer project list
 - **Type:** Modified
 - **Files:** `src/app/components/LocalRoadList.tsx` (modified), `tests/validation-workflow.test.cjs` (modified)

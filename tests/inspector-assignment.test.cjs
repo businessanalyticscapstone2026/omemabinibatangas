@@ -296,3 +296,26 @@ test('dropdown includes all active inspector accounts and excludes inactive acco
   assert.equal(options.length, 2);
   assert.deepEqual(options.map(item => item.id).sort(), ['i1', 'i2']);
 });
+
+test('a validated first historical follow-up is visible and recordable regardless of later decisions', async () => {
+  const selection = load('src/lib/inspection-selection.ts');
+  const first = {id:'first',localRoadId:'p',date:'2025-10-16',annualFollowUpYear:2025,isScheduledAnnualFollowUp:true};
+  const later = {...first,id:'later',date:'2026-10-16',annualFollowUpYear:2026};
+  const road = {id:'p',projectName:'Historical project',actualCompletionDate:'2024-11-14',inspectorId:'me',annualValidationEntries:[{year:2025,result:'Validated'},{year:2026,result:'Pending'},{year:2027,result:'Return for Revision'}]};
+  const state = {roleDb:'inspector',userId:'me',roads:[road,{id:'other',inspectorId:'other'}],inspections:[first,later,{...first,id:'not-mine',localRoadId:'other'}]};
+  const route = inspectionRoutes(state);
+  for (const role of ['inspector','head_engineer']) {
+    state.roleDb = role;
+    const response = await route.GET(request({}));
+    const cards = selection.inspectionCardsByValidation(response.body.data.filter(i=>i.localRoadId==='p'),state.roads);
+    assert.deepEqual(cards.map(i=>i.id),['first'],role);
+    if (role === 'inspector') assert.ok(!response.body.data.some(i=>i.localRoadId==='other'));
+  }
+  state.roleDb='inspector';
+  const ratings=Object.fromEntries(selection.assessmentComponents.map(label=>[label,label==='Concrete'?'Fair':'N/A']));
+  const body={...first,inspectionType:'Monitoring and Maintenance Inspection',conditionRatings:ratings,conditionRemarks:{Concrete:'Cracks'},conditionAttachments:{Concrete:[{stored:true}]}};
+  assert.equal((await route.PUT(request(body))).status,200);
+  assert.equal((await route.PUT(request({...body,...later}))).status,409);
+  const completed={...first,isScheduledAnnualFollowUp:false,conditionRatings:ratings};
+  assert.deepEqual(selection.eligibleMaintenanceInspections([completed,later],[]).map(i=>i.id),['first']);
+});
