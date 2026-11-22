@@ -142,6 +142,20 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
   const openMaintenanceDetails = (record: Maintenance, referenceId: string) => {
     setSelectedMaintenance({ record, referenceId });
   };
+  const maintenanceHistoryFor = (selected: Maintenance): Maintenance[] => maintenanceRecords
+    .filter(item => item.localRoadId === selected.localRoadId)
+    .slice().sort((a, b) => {
+      const inspectionFor = (item: Maintenance) => [...inspections, ...scheduledArchivedInspections].find(i => i.id === item.inspectionId);
+      const ai = inspectionFor(a); const bi = inspectionFor(b);
+      const ay = ai?.annualFollowUpYear || Number((ai?.date || a.dateStarted || a.scheduledDate || '').slice(0, 4)) || 0;
+      const by = bi?.annualFollowUpYear || Number((bi?.date || b.dateStarted || b.scheduledDate || '').slice(0, 4)) || 0;
+      return ay - by || String(a.dateStarted || a.scheduledDate || '').localeCompare(String(b.dateStarted || b.scheduledDate || '')) || a.id.localeCompare(b.id);
+    });
+  const maintenanceYear = (record: Maintenance) => {
+    const linked = [...inspections, ...scheduledArchivedInspections].find(i => i.id === record.inspectionId);
+    return linked?.annualFollowUpYear as number | undefined;
+  };
+
   const printMaintenance = (record: Maintenance, referenceId: string) => {
     const road = localRoadList.find((item) => item.id === record.localRoadId);
     void recordClientActivity(
@@ -160,19 +174,18 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
           { label: 'Project Description', value: road?.projectDescription || road?.description, width: 'full' },
         ],
       },
-      {
-        title: 'Maintenance Activity Information',
+      ...maintenanceHistoryFor(record).map(item => ({
+        title: `Maintenance Activity Information${maintenanceYear(item) ? ` · Annual Follow-up ${maintenanceYear(item)}` : ''}`,
         fields: [
-          { label: 'Date Started', value: record.dateStarted, width: 'third' },
-          { label: 'Completion Date', value: record.completedDate, width: 'third' },
-          { label: 'Type of Maintenance', value: record.type, width: 'third' },
-          { label: 'Status', value: record.status, width: 'third' },
-          { label: 'Scheduled Date', value: record.scheduledDate, width: 'third' },
-          { label: 'Budget', value: record.cost ? `Php ${Number(record.cost).toLocaleString()}` : '', width: 'third' },
-          { label: 'Maintenance Activities', value: record.description, width: 'full' },
-          { label: 'Remarks', value: record.remarks, width: 'full' },
+          { label: 'Date Started', value: item.dateStarted, width: 'third' as const },
+          { label: 'Completion Date', value: item.completedDate, width: 'third' as const },
+          { label: 'Type of Maintenance', value: item.type, width: 'third' as const },
+          { label: 'Status', value: item.status, width: 'third' as const },
+          { label: 'Scheduled Date', value: item.scheduledDate, width: 'third' as const },
+          { label: 'Maintenance Activities', value: item.description, width: 'full' as const },
+          { label: 'Remarks', value: item.remarks, width: 'full' as const },
         ],
-      },
+      })),
     ]);
     setSelectedMaintenance(null);
   };
@@ -665,8 +678,9 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
                     </div>
                   </div>
                 </section>
-                <section className="pt-5">
-                  <h3 className="mb-4 text-lg font-semibold text-gray-900">Maintenance Activity Information</h3>
+                {maintenanceHistoryFor(record).map((record) => (
+                <section key={record.id} className="pt-5">
+                  <h3 className="mb-4 text-lg font-semibold text-gray-900">{`Maintenance Activity Information${maintenanceYear(record) ? ` · Annual Follow-up ${maintenanceYear(record)}` : ''}`}</h3>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div>
                       <p className="mb-2 text-sm font-medium text-gray-700">Date Started</p>
@@ -688,10 +702,6 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
                       <p className="mb-2 text-sm font-medium text-gray-700">Scheduled Date</p>
                       <p className="min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-gray-700">{record.scheduledDate || ''}</p>
                     </div>
-                    <div>
-                      <p className="mb-2 text-sm font-medium text-gray-700">Budget</p>
-                      <p className="min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-gray-700">{record.cost ? `Php ${Number(record.cost).toLocaleString()}` : ''}</p>
-                    </div>
                     <div className="md:col-span-3">
                       <p className="mb-2 text-sm font-medium text-gray-700">Maintenance Activities</p>
                       <p className="min-h-[5rem] whitespace-pre-wrap rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-gray-700">
@@ -704,6 +714,7 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
                     </div>
                   </div>
                 </section>
+                ))}
                 {canPrint && (
                   <div className="mt-5 flex justify-end border-t border-slate-200 pt-5">
                     <button type="button" onClick={() => printMaintenance(record, referenceId)} className="inline-flex items-center gap-2 rounded-md bg-blue-700 px-5 py-2 text-sm font-medium text-white hover:bg-blue-800">

@@ -7,7 +7,7 @@ import { requireAuth, requireRole, forbidden, unauthorized, withRefresh } from '
 // @mine — step 6: the six workflow emails. Never throws; off until the mailbox is set.
 import { actionNote, notifyWorkflow } from '@/lib/notifications';
 import {
-  addActivityLog, archiveRoad, listArchivedRoads, listRoads,
+  addActivityLog, archiveRoad, listArchivedRoads, listRoads, listInspections, listArchivedInspections,
   permanentlyDeleteRoad, restoreRoad, saveAnnualValidation, requeueReturnedValidation, saveRoad, type StoredRecord,
 } from '@/lib/supabase-data';
 
@@ -64,9 +64,16 @@ export async function GET(request: Request) {
   try {
     const [data, archived] = await Promise.all([listRoads(auth.db, auth.admin), listArchivedRoads(auth.db)]);
     if (auth.profile.roleDb === 'inspector') {
+      // Former inspectors still need the project and road context for their own
+      // inspection history. This does not grant access to other inspections.
+      const [inspections, archivedInspections] = await Promise.all([
+        listInspections(auth.db, auth.admin), listArchivedInspections(auth.db),
+      ]);
+      const historicalProjects = new Set([...inspections, ...archivedInspections]
+        .filter(item => item.inspectorId === auth.userId).map(item => String(item.localRoadId)));
+      const visible = (road: StoredRecord) => String(road.inspectorId || '') === auth.userId || historicalProjects.has(String(road.id));
       return withRefresh(NextResponse.json({
-        data: data.filter(road => String(road.inspectorId || '') === auth.userId),
-        archived: archived.filter(road => String(road.inspectorId || '') === auth.userId),
+        data: data.filter(visible), archived: archived.filter(visible),
       }, { headers: { 'Cache-Control': 'private, no-store' } }), auth);
     }
     return withRefresh(NextResponse.json({ data, archived }, { headers: { 'Cache-Control': 'private, no-store' } }), auth);
@@ -187,7 +194,7 @@ export async function PATCH(request: Request) {
       const result = String(payload.validationResult);
       const remarks = String(payload.validationRemarks);
       // @mine — only anniversary entries are actionable; legacy initial decisions remain untouched.
-      await saveAnnualValidation(auth.db, payload.id, task.year, result, remarks, auth.userId);
+      await saveAnnualValidation(auth.admin, payload.id, task.year, result, remarks, auth.userId);
       await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Validation Saved', details: `Saved ${task.year} annual validation for project ${String(current.projectName || current.name || payload.id)}` });
       // Email 2 (Validator → Encoder) or email 4 (Validator → Head Engineer), never both.
       await notifyWorkflow(auth.admin, {
@@ -237,6 +244,11 @@ export async function PATCH(request: Request) {
     return withRefresh(NextResponse.json({ success: true, data: saved }), auth);
   } catch (error) {
     console.error('Failed to update project.', error);
+    const message = error && typeof error === 'object' && 'message' in error ? String(error.message) : '';
+    if (message === 'Record the first-anniversary inspection result before validating a later follow-up.' ||
+        message === 'Complete maintenance for the first-anniversary inspection before validating a later follow-up.') {
+      return NextResponse.json({ message }, { status: 409 });
+    }
     const failure = saveFailure(error, 'Unable to update this project. Your role may not permit it.');
     return NextResponse.json({ message: failure.message }, { status: failure.status });
   }

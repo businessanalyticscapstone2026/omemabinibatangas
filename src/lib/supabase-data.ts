@@ -390,10 +390,10 @@ export async function saveAnnualValidation(
   remarks: string,
   userId: string,
 ): Promise<void> {
-  const { data, error } = await db.from('annual_validation_entries').update({
-    result: VALIDATION_TO_DB[result], remarks: remarks.trim(),
-    validated_by: userId, validated_at: new Date().toISOString(),
-  }).eq('project_id', projectId).eq('year', year).is('deleted_at', null).select('id').maybeSingle();
+  const { data, error } = await db.rpc('save_annual_validation_with_assignment', {
+    p_project_id: projectId, p_year: year, p_result: VALIDATION_TO_DB[result],
+    p_remarks: remarks.trim(), p_user_id: userId,
+  });
   if (error) throw error;
   if (!data) throw new Error('Could not update this annual validation.');
 }
@@ -733,7 +733,7 @@ async function listInspectionsWhere(db: SupabaseClient, archived: boolean, admin
 export const listInspections = (db: SupabaseClient, admin?: SupabaseClient) => listInspectionsWhere(db, false, admin);
 export const listArchivedInspections = (db: SupabaseClient) => listInspectionsWhere(db, true);
 
-export async function saveInspection(db: SupabaseClient, rec: StoredRecord, projectId: string, userId: string): Promise<StoredRecord> {
+export async function saveInspection(db: SupabaseClient, rec: StoredRecord, projectId: string, userId: string, finalizeAnnual = false): Promise<StoredRecord> {
   const idValue = str(rec.id);
   const lookup = idValue ? await db.from('inspections').select('id, inspection_type, remarks').eq('id', idValue).maybeSingle() : null;
   if (lookup?.error) throw lookup.error;
@@ -749,16 +749,20 @@ export async function saveInspection(db: SupabaseClient, rec: StoredRecord, proj
     inspection_date: str(rec.date) || new Date().toISOString().slice(0, 10),
     inspection_type: existing?.inspection_type ?? INSPECTION_TYPE_TO_DB[str(rec.inspectionType)] ?? 'routine',
     ...(newPurpose ? { inspection_purpose: newPurpose } : {}),
-    inspector_id: userId,
-    overall_score: rec.conditionRating == null || rec.conditionRating === '' ? null : Number(rec.conditionRating),
+    ...(!finalizeAnnual ? { inspector_id: userId } : {}),
+    overall_score: finalizeAnnual ? null : rec.conditionRating == null || rec.conditionRating === '' ? null : Number(rec.conditionRating),
     remarks: existing?.remarks ?? (str(rec.remarks) || null),
     validation_status: VALIDATION_TO_DB[str(rec.validationStatus)] ?? 'pending',
     annual_follow_up_year: rec.annualFollowUpYear ? Number(rec.annualFollowUpYear) : null,
   };
   let id = idValue;
   if (existing) {
-    const { error } = await db.from('inspections').update(payload).eq('id', id);
+    let query = db.from('inspections').update(payload, { count: 'exact' }).eq('id', id);
+    // A stale pending form must never overwrite an already recorded result.
+    if (finalizeAnnual) query = query.is('overall_score', null);
+    const { error, count } = await query;
     if (error) throw error;
+    if (finalizeAnnual && count !== 1) throw new Error('This inspection was already recorded. Refresh and try again.');
   } else {
     const { data, error } = await db.from('inspections').insert(payload).select('id').single();
     if (error) throw error;
@@ -826,6 +830,16 @@ export async function saveInspection(db: SupabaseClient, rec: StoredRecord, proj
       });
       if (error) throw error;
     }
+  }
+
+  if (finalizeAnnual) {
+    const score = Number(rec.conditionRating);
+    if (!Number.isFinite(score) || score <= 0) throw new Error('A valid inspection score is required.');
+    const { data: finished, error: finishError } = await db.rpc('finish_annual_inspection', {
+      p_project_id: projectId, p_inspection_id: id, p_inspector_id: userId, p_score: score,
+    });
+    if (finishError) throw finishError;
+    if (!finished) throw new Error('The inspection assignment or annual queue changed. Refresh and try again.');
   }
 
   const { data, error } = await db.from('inspections').select(INSPECTION_SELECT).eq('id', id).single();
@@ -1276,22 +1290,23 @@ export async function saveAiRun(
   return runId;
 }
 
-/** Latest saved AI run, mapped to the UI's PredictionResult shape. */
+/** Newest saved result per project, including independently generated runs. */
 export async function getLatestAiPredictions(admin: SupabaseClient): Promise<StoredRecord[]> {
-  const { data: run } = await admin
-    .from('ai_analysis_runs')
-    .select('id')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!run) return [];
-  const { data, error } = await admin
-    .from('ai_priority_results')
-    .select('*, projects!ai_priority_results_project_id_fkey(project_name, roads!projects_road_id_fkey(road_name, current_condition, last_inspection_date), project_categories(name))')
-    .eq('run_id', run.id)
-    .order('priority_score', { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((row: Joined) => {
+  const latest = new Map<string, Joined>();
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await admin.from('ai_priority_results')
+      .select('*, projects!ai_priority_results_project_id_fkey(project_name, roads!projects_road_id_fkey(road_name, current_condition, last_inspection_date), project_categories(name))')
+      .order('created_at', { ascending: false }).order('id', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    for (const row of (data ?? []) as Joined[]) {
+      const id = str(row.project_id);
+      if (id && !latest.has(id)) latest.set(id, row);
+    }
+    if ((data ?? []).length < pageSize) break;
+  }
+  return Array.from(latest.values()).map((row: Joined) => {
     const project = (row.projects ?? {}) as Joined;
     const road = (project.roads ?? {}) as Joined;
     const factors = (row.factors ?? {}) as Joined;

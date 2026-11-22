@@ -13,14 +13,14 @@ function load(file, mocks = {}) {
 }
 const data = load('src/lib/supabase-data.ts', { '@/lib/attachment-validation': load('src/lib/attachment-validation.ts'), '@/lib/project-form-validation': load('src/lib/project-form-validation.ts'), '@/lib/supabase': { ROLE_FROM_DB: {}, ROLE_TO_DB: {} } });
 function mockDb(type) {
-  let saved;
+  let saved, rpcCall;
   const original = { id: 'i', project_id: 'p', inspection_date: '2026-01-01', inspection_type: type, annual_follow_up_year: type === 'follow_up' ? 2026 : null, validation_status: 'pending', inspection_items: [{component:'concrete',rating:'n/a'}] };
-  return { get saved() { return saved; }, from(table) {
+  return { get saved() { return saved; }, get rpcCall() { return rpcCall; }, async rpc(name,args) { rpcCall={name,args}; return {data:true,error:null}; }, from(table) {
     let op = 'select';
     const q = { select() { return q; }, eq() { return q; }, in() { return q; }, is() { return q; }, not() { return q; }, order() { return q; }, update(value) { op = 'update'; saved = value; return q; },
       maybeSingle: async () => ({ data: original, error: null }),
       single: async () => ({ data: { ...original, ...saved }, error: null }),
-      then(resolve, reject) { return Promise.resolve({ data: op === 'select' ? [] : null, error: null }).then(resolve, reject); },
+      then(resolve, reject) { return Promise.resolve({ data: op === 'select' ? [] : null, error: null, count: op === 'update' ? 1 : null }).then(resolve, reject); },
     }; return q;
   } };
 }
@@ -34,4 +34,13 @@ test('inspection purpose is saved and round-trips without changing legacy or ann
     assert.equal(updated.conditionRatings.Concrete, 'N/A');
     if (kind === 'follow_up') assert.equal(updated.annualFollowUpYear, 2026);
   }
+});
+
+
+test('annual results are finalized through the assignment queue after the pending row is saved', async () => {
+  const db=mockDb('follow_up');
+  await data.saveInspection(db, { id:'i', date:'2026-01-01', inspectionType:'Monitoring and Maintenance Inspection', conditionRating:5, annualFollowUpYear:2026 }, 'p', 'user', true);
+  assert.equal(db.saved.overall_score,null);
+  assert.equal('inspector_id' in db.saved,false);
+  assert.deepEqual(db.rpcCall,{name:'finish_annual_inspection',args:{p_project_id:'p',p_inspection_id:'i',p_inspector_id:'user',p_score:5}});
 });

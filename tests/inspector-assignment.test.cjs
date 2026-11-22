@@ -319,3 +319,31 @@ test('a validated first historical follow-up is visible and recordable regardles
   const completed={...first,isScheduledAnnualFollowUp:false,conditionRatings:ratings};
   assert.deepEqual(selection.eligibleMaintenanceInspections([completed,later],[]).map(i=>i.id),['first']);
 });
+
+test('prior inspectors retain their own records and new assignees cannot edit other inspectors results', async () => {
+  const selection=load('src/lib/inspection-selection.ts');
+  const road={id:'p',actualCompletionDate:'2023-11-14',inspectorId:'new',annualValidationEntries:[{year:2024,result:'Validated'},{year:2025,result:'Validated'}]};
+  const old={id:'old',localRoadId:'p',date:'2024-10-16',annualFollowUpYear:2024,inspectorId:'old-inspector'};
+  const pending={id:'next',localRoadId:'p',date:'2025-10-16',annualFollowUpYear:2025,isScheduledAnnualFollowUp:true};
+  const state={roleDb:'inspector',userId:'old-inspector',roads:[road],inspections:[old,pending]}; const route=inspectionRoutes(state);
+  let response=await route.GET(request({})); assert.deepEqual(response.body.data.map(i=>i.id),['old']); assert.equal(response.body.data[0].canEdit,false);
+  state.userId='new'; response=await route.GET(request({})); assert.deepEqual(response.body.data.map(i=>i.id),['old','next']);
+  assert.equal(response.body.data[0].canEdit,false); assert.equal(response.body.data[1].canEdit,true);
+  const ratings=Object.fromEntries(selection.assessmentComponents.map(label=>[label,label==='Concrete'?'Good':'N/A']));
+  const result=await route.PUT(request({...old,inspectionType:'Monitoring and Maintenance Inspection',conditionRatings:ratings,conditionRemarks:{},conditionAttachments:{}}));
+  assert.equal(result.status,403);assert.match(result.body.message,/read-only/);
+});
+
+test('a later validated inspection cannot be recorded while an earlier validated inspection is pending', async () => {
+  const selection = load('src/lib/inspection-selection.ts');
+  const first = {id:'first',localRoadId:'p',date:'2025-10-16',annualFollowUpYear:2025,isScheduledAnnualFollowUp:true};
+  const later = {...first,id:'later',date:'2026-10-16',annualFollowUpYear:2026};
+  const road = {id:'p',actualCompletionDate:'2024-11-14',inspectorId:'me',annualValidationEntries:[{year:2025,result:'Validated'},{year:2026,result:'Validated'}]};
+  const state = {roleDb:'inspector',userId:'me',roads:[road],inspections:[first,later]};
+  const ratings=Object.fromEntries(selection.assessmentComponents.map(label=>[label,label==='Concrete'?'Good':'N/A']));
+  const form={inspectionType:'Monitoring and Maintenance Inspection',conditionRatings:ratings,conditionRemarks:{},conditionAttachments:{}};
+  const route=inspectionRoutes(state);
+  const blocked=await route.PUT(request({...later,...form}));
+  assert.equal(blocked.status,409); assert.match(blocked.body.message,/earlier validated/);
+  assert.equal((await route.PUT(request({...first,...form}))).status,200);
+});

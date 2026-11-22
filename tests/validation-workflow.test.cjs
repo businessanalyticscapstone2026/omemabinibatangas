@@ -93,25 +93,16 @@ test('validator can only update a currently due annual task, never an initial de
   assert.equal((await patch({ id: 'p', validationResult: 'Return for Revision', validationRemarks: 'Fix' })).status, 409);
   assert.equal((await patch({ id: 'p', annualValidationYear: 2004, validationResult: 'Validated', validationRemarks: 'Done' })).status, 409);
   assert.equal((await patch({ id: 'p', annualValidationYear: 2005, validationResult: 'Return for Revision', validationRemarks: 'Annual fix' })).status, 200);
-  assert.deepEqual(calls[0], ['user', 'p', 2005, 'Return for Revision', 'Annual fix', 'u']);
+  assert.deepEqual(calls[0], ['admin', 'p', 2005, 'Return for Revision', 'Annual fix', 'u']);
   role = 'encoder'; assert.equal((await patch({ id: 'p', annualValidationYear: 2005, validationResult: 'Validated', validationRemarks: 'No' })).status, 403);
 });
 
-test('annual validation writes only validation columns and fails on zero rows', async () => {
+test('annual validation uses the atomic assignment workflow and fails on zero rows', async () => {
   const dm = load('src/lib/supabase-data.ts', { '@/lib/attachment-validation': load('src/lib/attachment-validation.ts'), '@/lib/project-form-validation': load('src/lib/project-form-validation.ts'), '@/lib/supabase': { ROLE_FROM_DB: {}, ROLE_TO_DB: {} } });
-  let calls = [], found = true;
-  const db = { from: table => {
-    const chain = {
-      update(value) { calls.push({ table, value, filters: [] }); return chain; },
-      eq(key, value) { calls.at(-1).filters.push([key, value]); return chain; },
-      is(key, value) { calls.at(-1).filters.push([key, value]); return chain; },
-      select() { return chain; }, maybeSingle: async () => ({ data: found ? { id: 'p' } : null, error: null }),
-    }; return chain;
-  } };
+  let call, found = true;
+  const db = { rpc: async (name, args) => { call = {name,args}; return { data: found, error: null }; } };
   await dm.saveAnnualValidation(db, 'p', 2026, 'Validated', ' OK ', 'user');
-  assert.deepEqual(calls[0].filters, [['project_id', 'p'], ['year', 2026], ['deleted_at', null]]);
-  assert.equal(calls[0].value.result, 'approved'); assert.equal(calls[0].value.remarks, 'OK');
-  assert.equal('due_date' in calls[0].value, false);
+  assert.deepEqual(call, {name:'save_annual_validation_with_assignment',args:{p_project_id:'p',p_year:2026,p_result:'approved',p_remarks:'OK',p_user_id:'user'}});
   found = false; await assert.rejects(dm.saveAnnualValidation(db, 'p', 2026, 'Validated', 'Done', 'user'), /Could not update/);
 });
 
@@ -351,4 +342,24 @@ test('an approved follow-up appears as soon as validated on the first window day
   const writes=[];const db={from(table){const chain={select(){return chain;},is(){return chain;},not(){return chain;},eq(){return chain;},upsert(value){writes.push({table,value});return Promise.resolve({error:null});},insert(value){writes.push({table,value});return Promise.resolve({error:null});},then(resolve,reject){const data=table==='projects'?[{id:'p',actual_completion_date:'2026-11-11'}]:table==='annual_validation_entries'?[{year:2027,result:'approved',deleted_at:null}]:[];return Promise.resolve({data,error:null}).then(resolve,reject);}};return chain;}};
   try {global.Date=MockDate;await dm.ensureAnnualFollowUps(db);} finally {global.Date=RealDate;}
   const inspection=writes.find(w=>w.table==='inspections');assert.equal(inspection.value.annual_follow_up_year,2027);assert.equal(inspection.value.inspection_date,'2027-10-13');
+});
+
+test('validator receives the first follow-up prerequisite error and no validation email is sent', async () => {
+  let message='Record the first-anniversary inspection result before validating a later follow-up.', notifications=0;
+  const project={id:'p',name:'Road',actualCompletionDate:'2000-01-01',annualValidationEntries:[entry(2001,'Validated','OK'),entry(2002)]};
+  const res=(status,body={})=>({status,body});
+  const route=load('src/app/api/local-road/route.ts',{
+    'next/server':{NextResponse:{json:(body,init)=>res(init?.status||200,body)}},
+    '@/lib/project-validation-workflow':workflow,
+    '@/lib/project-form-validation':load('src/lib/project-form-validation.ts'),
+    '@/lib/notifications':{notifyWorkflow:async()=>{notifications++;},actionNote:()=>''},
+    '@/lib/api':{requireAuth:async()=>({profile:{roleDb:'validator',username:'Tester'},db:'user',admin:'admin',userId:'u'}),forbidden:()=>res(403),unauthorized:()=>res(401),withRefresh:r=>r},
+    '@/lib/supabase-data':{listRoads:async()=>[project],saveAnnualValidation:async()=>{throw {message,code:'P0001'};},addActivityLog:async()=>{}},
+  });
+  const payload={id:'p',annualValidationYear:2002,validationResult:'Validated',validationRemarks:'OK'};
+  for (message of ['Record the first-anniversary inspection result before validating a later follow-up.','Complete maintenance for the first-anniversary inspection before validating a later follow-up.']) {
+    const response=await route.PATCH({json:async()=>payload});
+    assert.equal(response.status,409);assert.equal(response.body.message,message);
+  }
+  assert.equal(notifications,0);
 });

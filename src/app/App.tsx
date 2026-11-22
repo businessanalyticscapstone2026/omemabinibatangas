@@ -159,6 +159,7 @@ export default function App() {
   const [scheduledInspectionIds, setScheduledInspectionIds] = useState<string[]>([]);
   const [scheduledArchivedInspections, setScheduledArchivedInspections] = useState<any[]>([]);
   const [aiRecommendations, setAiRecommendations] = useState<PredictionResult[]>([]);
+  const [aiRecommendationsLoaded, setAiRecommendationsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
@@ -187,13 +188,15 @@ export default function App() {
   useEffect(() => {
     if (!isLoggedIn) return;
     let cancelled = false;
+    setAiRecommendationsLoaded(false);
     fetch('/api/ai-priority')
       .then(async (response) => (response.ok ? response.json() : null))
       .then((payload) => {
-        if (cancelled || !Array.isArray(payload?.data) || payload.data.length === 0) return;
+        if (cancelled || !Array.isArray(payload?.data)) return;
         if (payload.data.every(isPredictionResult)) setAiRecommendations(payload.data);
       })
-      .catch((error: unknown) => console.error('Failed to load saved AI recommendations.', error));
+      .catch((error: unknown) => console.error('Failed to load saved AI recommendations.', error))
+      .finally(() => { if (!cancelled) setAiRecommendationsLoaded(true); });
     return () => { cancelled = true; };
   }, [isLoggedIn]);
 
@@ -611,6 +614,7 @@ export default function App() {
         const update = payload.roadUpdates?.find((item: { id: string }) => item.id === road.id);
         return update ? { ...road, condition: update.condition, lastInspection: update.lastInspection } : road;
       }));
+      window.dispatchEvent(new Event('local-road-records-changed'));
       return true;
     } catch (error) {
       console.error('Failed to update inspection.', error);
@@ -808,13 +812,16 @@ export default function App() {
                   userRole={userRole}
                 />
               )}
-              {activeTab === 'ai' && hasAccess('ai') && (
-                <AIPredictionModule
-                  localRoadData={localRoadData}
-                  inspections={inspections}
-                  predictions={aiRecommendations}
-                  onPredictionsChange={handleAiRecommendationsChange}
-                />
+              {hasAccess('ai') && (
+                <div hidden={activeTab !== 'ai'}>
+                  <AIPredictionModule
+                    localRoadData={localRoadData}
+                    inspections={inspections}
+                    predictions={aiRecommendations}
+                    recommendationsLoaded={aiRecommendationsLoaded}
+                    onPredictionsChange={handleAiRecommendationsChange}
+                  />
+                </div>
               )}
               {activeTab === 'analytics' && hasAccess('analytics') && (
                 <AnalyticsDashboard

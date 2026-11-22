@@ -291,8 +291,7 @@ test('inspection overview follows history changes and pending annual cards keep 
       assert.equal(table.querySelectorAll('th').length, 4);
       assert.equal(container.querySelector('button[aria-label="Print inspection overview"]'), null);
     }
-    assert.deepEqual([...table.querySelectorAll('tbody td')].map(td=>td.textContent),['Poblacion Road','','','']);
-    assert.equal(table.querySelector('tbody tr td:last-child').colSpan,role === 'Head Engineer' ? 2 : 1);
+    assert.match(table.querySelector('tbody').textContent,/No inspections match/);
     await act(async()=>root.render(React.createElement(InspectionModule,{inspections:[{...pending,isScheduledAnnualFollowUp:false,conditionRating:6,conditionRatings:{Concrete:'Fair'},conditionRemarks:{Concrete:'Cracks'}}],localRoadList:[{id:'road-1',name:'Poblacion Road',contractedAmount:'1234567.5'}],onAddInspection(){},onEditInspection(){},onDeleteInspection(){},currentUser:'User',userRole:role})));
     table=container.querySelector('table'); assert.deepEqual([...table.querySelectorAll('tbody td')].map(td=>td.textContent),['Poblacion Road','2027-01-01','Php 1,234,567.50','Cracks.']);
     await act(async()=>tabs().find(el=>el.textContent.includes('Inspection History')).click()); assert.match(container.textContent,/Cracks/);
@@ -327,9 +326,8 @@ test('task 14: the inspection overview prints every record, or a single year', a
   const print = () => container.querySelector('button[aria-label="Print inspection overview"]');
   await act(async () => print().click());
   let sections = printedDocuments.at(-1).sections;
-  // Printing includes all visible rows; pending findings stay blank.
-  assert.deepEqual(sections.map(section => section.title).sort(), ['Anilao Road', 'Bagalangit Road', 'Poblacion Road']);
-  assert.equal(sections.find(section => section.title === 'Bagalangit Road').fields[2].value, '');
+  // Overview and its print list recorded results only.
+  assert.deepEqual(sections.map(section => section.title).sort(), ['Anilao Road', 'Poblacion Road']);
   assert.deepEqual(sections[0].fields.map(field => field.label), ['Date of Inspection', 'Amount Contracted', 'Findings / Remarks']);
 
   const year = container.querySelector('select[aria-label="Print inspection overview year"]');
@@ -368,7 +366,7 @@ test('pending inspection view and print do not expose stale results', async () =
   const dialog=container.querySelector('.inspection-detail-dialog');
   const observation=[...dialog.querySelectorAll('p')].find(p=>p.textContent==='Observation Notes');
   assert.equal(observation.nextElementSibling.textContent.trim(),'');
-  for(const label of ['Condition','Follow-up Status']) {
+  for(const label of ['Condition']) {
     const el=[...dialog.querySelectorAll('span')].find(e=>e.textContent===label);
     assert.equal(el.nextElementSibling.textContent,'Pending');
   }
@@ -407,4 +405,82 @@ test('inspection card and date use the validated annual year without a year sele
   const input=[...container.querySelectorAll('input[type=date]')].find(item=>item.required);
   assert.equal(input.min,'2024-07-06');
   act(()=>root.unmount()); container.remove();
+});
+
+
+test('inspection overview shows a separate row for each completed annual follow-up', async () => {
+  const first={id:'first',localRoadId:'road-1',localRoadName:'Poblacion Road',date:'2024-11-11',annualFollowUpYear:2024,conditionRatings:{Concrete:'Fair'},conditionRemarks:{Concrete:'Cracks'}};
+  const second={...first,id:'second',date:'2025-11-11',annualFollowUpYear:2025,conditionRatings:{Concrete:'Poor'},conditionRemarks:{Concrete:'Potholes'}};
+  const pending={...first,id:'third',date:'2026-11-11',annualFollowUpYear:2026,isScheduledAnnualFollowUp:true};
+  const {container,root}=renderModule([first,second,pending],'Head Engineer');
+  await act(async()=>[...container.querySelectorAll('[role=tab]')].find(el=>el.textContent.includes('Overview')).click());
+  const rows=[...container.querySelectorAll('[aria-label="Inspection Overview"] tbody tr')];
+  assert.equal(rows.length,2);assert.match(rows.map(row=>row.textContent).join(' '),/Cracks/);assert.match(rows.map(row=>row.textContent).join(' '),/Potholes/);
+  await act(async()=>container.querySelector('button[aria-label="Print inspection overview"]').click());
+  assert.equal(printedDocuments.at(-1).sections.length,2);
+  act(()=>root.unmount());container.remove();
+});
+
+test('inspection detail and print preserve old results followed by the pending follow-up', async () => {
+  const old={id:'old',localRoadId:'road-1',localRoadName:'Poblacion Road',date:'2024-11-11',annualFollowUpYear:2024,conditionRating:7,conditionRatings:{Concrete:'Fair'},conditionRemarks:{Concrete:'Old cracks'},inspector:'First'};
+  const next={...pendingInspection,id:'next',date:'2025-11-11',annualFollowUpYear:2025};
+  const {container,root}=renderModule([old,next],'Head Engineer');
+  await act(async()=>root.render(React.createElement(InspectionModule,{inspections:[old,next],localRoadList:[{id:'road-1',name:'Poblacion Road',annualValidationEntries:[{year:2024,result:'Validated'},{year:2025,result:'Validated'}]}],onAddInspection(){},onEditInspection:async()=>true,onDeleteInspection:async()=>true,currentUser:'Head',userRole:'Head Engineer'})));
+  const card=container.querySelector('article');assert.match(card.textContent,/Pending/);await act(async()=>card.click());
+  const detail=container.querySelector('.inspection-detail-dialog');const text=detail.textContent;
+  assert.ok(text.indexOf('Annual Follow-up 2024')<text.indexOf('Annual Follow-up 2025'));assert.match(text,/Old cracks/);
+  await act(async()=>[...detail.querySelectorAll('button')].find(b=>b.textContent.includes('Print')).click());
+  const titles=printedDocuments.at(-1).sections.map(s=>s.title);assert.ok(titles.indexOf('Inspection Details · Annual Follow-up 2024')<titles.indexOf('Inspection Details · Annual Follow-up 2025'));
+  const older=printedDocuments.at(-1).sections.find(s=>s.title==='Local Road Condition Assessment · Annual Follow-up 2024');assert.match(JSON.stringify(older),/Old cracks/);
+  act(()=>root.unmount());container.remove();
+});
+
+test('a pending annual inspection starts with empty result fields even if a placeholder contains stale data', () => {
+  const stale={...pendingInspection, conditionRatings:{Concrete:'Fair'},conditionRemarks:{Concrete:'Earlier remark'},conditionAttachments:{Concrete:[{name:'old.jpg'}]},remarks:'Earlier remark',inspectionType:'Monitoring and Maintenance Inspection'};
+  const {container,root}=renderModule([stale]);openPendingForm(container);
+  assert.equal(container.querySelector('input[name="condition-Concrete"][value="Fair"]').checked,false);
+  assert.equal(container.querySelector('[data-category-remark="Concrete"]').value,'');
+  assert.doesNotMatch(container.querySelector('.module-form-panel').textContent,/old.jpg/);
+  act(()=>root.unmount());container.remove();
+});
+
+test('inspection details and print omit the submitted attachment section without hiding assessment files', async () => {
+  const inspection={...pendingInspection,isScheduledAnnualFollowUp:false,conditionRating:5,conditionRatings:{Concrete:'Fair'},conditionRemarks:{Concrete:'Crack'},conditionAttachments:{Concrete:[{name:'assessment.jpg',type:'image/jpeg',dataUrl:'data:image/jpeg;base64,AA=='}]},attachment:{name:'submitted.jpg',type:'image/jpeg',dataUrl:'data:image/jpeg;base64,AA=='}};
+  const {container,root}=renderModule([inspection],'Head Engineer');
+  await act(async()=>container.querySelector('[aria-label^="View full inspection"]').click());
+  const dialog=container.querySelector('.inspection-detail-dialog');
+  assert.doesNotMatch(dialog.textContent,/Submitted Attachments|submitted.jpg/);
+  assert.match(dialog.textContent,/assessment.jpg/);
+  await act(async()=>[...dialog.querySelectorAll('button')].find(b=>b.textContent.includes('Print')).click());
+  assert.equal(printedDocuments.at(-1).attachment,undefined);
+  act(()=>root.unmount());container.remove();
+});
+
+test('inspection view and print place full-width location above road information and dates in each follow-up detail', async () => {
+  const older={...pendingInspection,id:'old',isScheduledAnnualFollowUp:false,isAnnualFollowUp:true,annualFollowUpYear:2025,date:'2025-11-11',conditionRating:8};
+  const newer={...older,id:'new',annualFollowUpYear:2026,date:'2026-11-11'};
+  const {container,root}=renderModule([older,newer],'Head Engineer');
+  await act(async()=>container.querySelector('[aria-label^="View full inspection"]').click());
+  const dialog=container.querySelector('.inspection-detail-dialog');
+  const sections=[...dialog.querySelectorAll('section')];
+  const project=sections.find(section=>section.querySelector('h3')?.textContent==='Project Information');
+  const location=[...project.querySelectorAll('span')].find(span=>span.textContent==='Location');
+  assert.ok(location.parentElement.classList.contains('md:col-span-2'));
+  assert.doesNotMatch(project.textContent,/Inspection Date/);
+  const details=sections.filter(section=>section.querySelector('h3')?.textContent.startsWith('Inspection Details'));
+  assert.equal(details.length,2);
+  for (const [index, section] of details.entries()) {
+    assert.doesNotMatch(section.textContent,/Follow-up Status/);
+    const label=[...section.querySelectorAll('span')].find(span=>span.textContent==='Inspection Date');
+    assert.equal(label.nextElementSibling.textContent,['2025-11-11','2026-11-11'][index]);
+  }
+  await act(async()=>[...dialog.querySelectorAll('button')].find(button=>button.textContent.includes('Print')).click());
+  const print=printedDocuments.at(-1).sections;
+  const projectFields=print.find(section=>section.title==='Project Information').fields;
+  assert.equal(projectFields.find(field=>field.label==='Location').width,'full');
+  assert.ok(!projectFields.some(field=>field.label==='Inspection Date'));
+  const printDetails=print.filter(section=>section.title.startsWith('Inspection Details'));
+  assert.deepEqual(printDetails.map(section=>section.fields.find(field=>field.label==='Inspection Date').value),['2025-11-11','2026-11-11']);
+  assert.ok(printDetails.every(section=>!section.fields.some(field=>field.label==='Follow-up Status')));
+  act(()=>root.unmount());container.remove();
 });

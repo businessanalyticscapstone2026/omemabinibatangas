@@ -78,6 +78,76 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Generate AI recommendations automatically for new inspections
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/api/ai-priority/route.ts` (modified), `src/app/components/AIPredictionModule.tsx` (modified), `src/lib/supabase-data.ts` (modified), `tests/project-form.test.cjs` (modified), `tests/ai-persistence.test.cjs` (new)
+- **What & why:** Keep each eligible project's justification and maintenance activity current without regenerating unrelated results.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Require first follow-up results before later validation
+- **Type:** Modified
+- **Files:** `src/app/api/local-road/route.ts` (modified), `tests/validation-workflow.test.cjs` (modified), `supabase/migrations/20261124_first_followup_validation_gate.sql` (new), `tests/first-followup-validation-gate.test.cjs` (new)
+- **What & why:** Block later approval until first-year inspection and any required maintenance are recorded.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Queue inspector reassignment for validated later follow-ups
+- **Type:** Modified
+- **Files:** `package-lock.json` (modified), `package.json` (modified), `src/app/App.tsx` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/api/local-road/route.ts` (modified), `src/lib/supabase-data.ts` (modified), `tests/inspection-purpose.test.cjs` (modified), `tests/validation-workflow.test.cjs` (modified), `supabase/migrations/20261123_annual_inspector_queue.sql` (new), `tests/annual-inspector-queue.test.cjs` (new)
+- **What & why:** A later approved year requires a new assignment without interrupting earlier validated work or replacing inspection history.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Move inspection dates into follow-up details
+- **Type:** Modified
+- **Files:** `src/app/components/InspectionModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified)
+- **What & why:** Show location across a full row and put each inspection date with its own details in view and print.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Preserve inspector project details and simplify history views
+- **Type:** Modified
+- **Files:** `src/app/api/local-road/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/project-form.test.cjs` (modified), `tests/role-crud.test.cjs` (modified)
+- **What & why:** Keep project and road information available to former inspectors while omitting submitted attachments and maintenance budgets from view and print.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Enforce annual follow-up maintenance dates
+- **Type:** Modified
+- **Files:** `MY-CHANGES.md` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/api/maintenance/route.ts` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/role-crud.test.cjs` (modified)
+- **What & why:** Use each follow-up inspection date for maintenance and keep completion on or after its start date.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Guard the order of validated annual inspections
+- **Type:** Modified
+- **Files:** `src/app/api/inspections/route.ts` (modified), `tests/inspector-assignment.test.cjs` (modified)
+- **What & why:** An earlier unfinished inspection must be recorded before a later validated follow-up.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Preserve follow-up history in inspection and maintenance details
+- **Type:** Modified
+- **Files:** `src/app/components/InspectionModule.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Show and print each year's recorded inspection and maintenance activity in order, and start new inspection forms without previous answers.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Preserve prior inspector read access
+- **Type:** Modified
+- **Files:** `MY-CHANGES.md` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Keep previously recorded inspections visible to their original inspector after reassignment, and prevent the current inspector from editing another inspector's recorded result.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Box annual validation results and list each inspection in overview
+- **Type:** Modified
+- **Files:** `src/app/components/InspectionModule.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Make validation status and remarks easier to read and retain a separate overview row and print entry for each completed follow-up.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Update validation history, date rules, and singleton staff roles
 - **Type:** Modified
 - **Files:** `src/app/api/auth/status/route.ts` (modified), `src/app/api/local-road/annual-validation/route.ts` (modified), `src/app/api/local-road/route.ts` (modified), `src/app/components/LocalRoadForm.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `src/app/components/UserManagementModule.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `tests/password-boundaries.test.cjs` (modified), `tests/project-form.test.cjs` (modified), `tests/single-head-engineer.test.cjs` (modified), `tests/validation-workflow.test.cjs` (modified), `supabase/migrations/20261122_singleton_staff_roles.sql` (new)
