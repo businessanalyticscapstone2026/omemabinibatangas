@@ -467,3 +467,33 @@ test('maintenance completion cannot precede its start, including historical and 
     assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:'2025-01-03'}))).status,200);
   } finally { Object.assign(data,old); }
 });
+
+test('later annual inspection and maintenance dates use the requested year and linked inspection', async () => {
+  const old={listRoads:data.listRoads,listInspections:data.listInspections,listArchivedInspections:data.listArchivedInspections,listMaintenance:data.listMaintenance,listArchivedMaintenance:data.listArchivedMaintenance,saveInspection:data.saveInspection,saveRoad:data.saveRoad,saveMaintenance:data.saveMaintenance};
+  try {
+    const followUp={id:'i',localRoadId:'p',date:'2026-11-11',annualFollowUpYear:2026,isScheduledAnnualFollowUp:true};
+    role='inspector'; data.listRoads=async()=>[{id:'p',actualCompletionDate:'2024-11-11',inspectorId:'test',annualValidationEntries:[{year:2026,result:'Validated'}]}];
+    data.listInspections=async()=>[followUp]; data.listMaintenance=async()=>[]; data.listArchivedMaintenance=async()=>[];
+    data.saveInspection=async(_db,payload)=>payload; data.saveRoad=async(_db,road)=>road;
+    const labels=loadTs('src/lib/inspection-selection.ts',{}).assessmentComponents;
+    const conditionRatings=Object.fromEntries(labels.map(label=>[label,label==='Concrete'?'Good':'N/A']));
+    const body={id:'i',localRoadId:'p',inspectionType:'Monitoring and Maintenance Inspection',conditionRatings,conditionRemarks:{},conditionAttachments:{}};
+    assert.equal((await routes.inspections.PUT(request({...body,date:'2026-10-12'}))).status,400);
+    assert.equal((await routes.inspections.PUT(request({...body,date:'2026-10-13'}))).status,200);
+    assert.equal((await routes.inspections.PUT(request({...body,date:'2026-11-11'}))).status,200);
+    role='encoder'; data.listInspections=async()=>[{...followUp,isScheduledAnnualFollowUp:false,conditionRatings:{Concrete:'Fair'}}]; data.listArchivedInspections=async()=>[];
+    data.saveMaintenance=async(_db,payload)=>({...payload,id:'m'});
+    const base={localRoadId:'p',inspectionId:'i',type:'Corrective Maintenance',description:'Repair',remarks:'Done',cost:0};
+    assert.equal((await routes.maintenance.POST(request({...base,dateStarted:'2026-11-11',scheduledDate:'2026-11-12'}))).status,400);
+    assert.equal((await routes.maintenance.POST(request({...base,dateStarted:'2026-11-12',scheduledDate:'2026-11-12'}))).status,200);
+    data.listMaintenance=async()=>[{...base,id:'m',status:'In Progress',dateStarted:'2026-11-12',scheduledDate:'2026-11-12'}];
+    assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed'}))).status,409);
+    assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:'2026-11-11'}))).status,400);
+    assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:'2026-11-12'}))).status,200);
+    data.listMaintenance=async()=>[{...base,id:'m',status:'In Progress',dateStarted:'2026-11-14',scheduledDate:'2026-11-14'}];
+    assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:'2026-11-13'}))).status,400);
+    assert.equal((await routes.maintenance.PATCH(request({id:'m',status:'Completed',completedDate:'2026-11-14'}))).status,200);
+    data.listMaintenance=async()=>[{...base,id:'m',status:'Completed',dateStarted:'2026-11-12',scheduledDate:'2026-11-12',completedDate:'2026-11-12'}];
+    assert.equal((await routes.maintenance.PATCH(request({...base,id:'m',dateStarted:'2026-11-13',scheduledDate:'2026-11-13'}))).status,400);
+  } finally {Object.assign(data,old);}
+});

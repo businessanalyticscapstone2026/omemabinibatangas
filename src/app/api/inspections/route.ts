@@ -1,5 +1,5 @@
 // @mine — rewritten for Supabase (was SQLite). See src/lib/supabase-data.ts.
-import { validateAssessment, findingsSummary } from '@/lib/inspection-selection';
+import { validateAssessment, findingsSummary, inspectionCardsByValidation, type InspectionSummary } from '@/lib/inspection-selection';
 import { hasFourDigitYear, addCalendarDays, anniversaryMinusDays, INSPECTION_DAYS_BEFORE } from '@/lib/project-form-validation';
 import { NextResponse } from 'next/server';
 import { requireAuth, requireRole, unauthorized, withRefresh } from '@/lib/api';
@@ -170,7 +170,8 @@ export async function PUT(request: Request) {
     return NextResponse.json({ message: 'Select an inspection type and complete every assessment, including remarks and attachments for Fair, Poor, and Bad components.' }, { status: 400 });
   }
   payload.remarks = findingsSummary(ratings, remarks);
-  const existing = (await listInspections(auth.db)).find((item) => item.id === payload.id);
+  const inspections = await listInspections(auth.db);
+  const existing = inspections.find((item) => item.id === payload.id);
   if (!existing) return NextResponse.json({ message: 'Inspection not found.' }, { status: 404 });
   const road = (await listRoads(auth.db, auth.admin)).find((item) => item.id === payload.localRoadId);
   if (!road) return NextResponse.json({ message: 'Road not found.' }, { status: 404 });
@@ -179,6 +180,10 @@ export async function PUT(request: Request) {
   }
   if (existing.inspectorId && existing.inspectorId !== auth.userId) return NextResponse.json({ message: 'Another inspector recorded this inspection; it is read-only.' }, { status: 403 });
   if (existing.isScheduledAnnualFollowUp && !annualYearIsValidated(road, existing.annualFollowUpYear)) return NextResponse.json({ message: 'The annual validation for this inspection year must be approved first.' }, { status: 409 });
+  if (existing.isScheduledAnnualFollowUp && Array.isArray(road.annualValidationEntries)) {
+    const current = inspectionCardsByValidation(inspections.filter(item => item.localRoadId === road.id) as unknown as InspectionSummary[], [{ id: String(road.id), annualValidationEntries: road.annualValidationEntries as Array<{ year: number; result: string }> }])[0];
+    if (!current || current.id !== existing.id) return NextResponse.json({ message: 'Complete the earlier validated annual inspection first.' }, { status: 409 });
+  }
   const minimum = earliestInspectionDate(road, payload, existing);
   if (!minimum) return NextResponse.json({ message: 'The project completion date could not be verified.' }, { status: 400 });
   if (payload.date < minimum) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });

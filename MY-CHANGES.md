@@ -78,6 +78,20 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Enforce annual follow-up maintenance dates
+- **Type:** Modified
+- **Files:** `MY-CHANGES.md` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/api/maintenance/route.ts` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/role-crud.test.cjs` (modified)
+- **What & why:** Use each follow-up inspection date for maintenance and keep completion on or after its start date.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Guard the order of validated annual inspections
+- **Type:** Modified
+- **Files:** `src/app/api/inspections/route.ts` (modified), `tests/inspector-assignment.test.cjs` (modified)
+- **What & why:** An earlier unfinished inspection must be recorded before a later validated follow-up.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Preserve follow-up history in inspection and maintenance details
 - **Type:** Modified
 - **Files:** `src/app/components/InspectionModule.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/project-form.test.cjs` (modified)

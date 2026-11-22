@@ -333,3 +333,17 @@ test('prior inspectors retain their own records and new assignees cannot edit ot
   const result=await route.PUT(request({...old,inspectionType:'Monitoring and Maintenance Inspection',conditionRatings:ratings,conditionRemarks:{},conditionAttachments:{}}));
   assert.equal(result.status,403);assert.match(result.body.message,/read-only/);
 });
+
+test('a later validated inspection cannot be recorded while an earlier validated inspection is pending', async () => {
+  const selection = load('src/lib/inspection-selection.ts');
+  const first = {id:'first',localRoadId:'p',date:'2025-10-16',annualFollowUpYear:2025,isScheduledAnnualFollowUp:true};
+  const later = {...first,id:'later',date:'2026-10-16',annualFollowUpYear:2026};
+  const road = {id:'p',actualCompletionDate:'2024-11-14',inspectorId:'me',annualValidationEntries:[{year:2025,result:'Validated'},{year:2026,result:'Validated'}]};
+  const state = {roleDb:'inspector',userId:'me',roads:[road],inspections:[first,later]};
+  const ratings=Object.fromEntries(selection.assessmentComponents.map(label=>[label,label==='Concrete'?'Good':'N/A']));
+  const form={inspectionType:'Monitoring and Maintenance Inspection',conditionRatings:ratings,conditionRemarks:{},conditionAttachments:{}};
+  const route=inspectionRoutes(state);
+  const blocked=await route.PUT(request({...later,...form}));
+  assert.equal(blocked.status,409); assert.match(blocked.body.message,/earlier validated/);
+  assert.equal((await route.PUT(request({...first,...form}))).status,200);
+});
