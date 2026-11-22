@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Move inspection dates into follow-up details
+- **Type:** Modified
+- **Files:** `src/app/components/InspectionModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified)
+- **What & why:** Show location across a full row and put each inspection date with its own details in view and print.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Preserve inspector project details and simplify history views
 - **Type:** Modified
 - **Files:** `src/app/api/local-road/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/project-form.test.cjs` (modified), `tests/role-crud.test.cjs` (modified)

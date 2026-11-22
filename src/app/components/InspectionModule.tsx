@@ -600,7 +600,7 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
           { label: 'Project / Program / Activity Name', value: projectName, width: 'half' },
           { label: 'Project Category', value: road?.projectCategory || road?.type || inspection.projectCategory, width: 'half' },
           { label: 'Project Description', value: road?.projectDescription || road?.description || inspection.projectDescription },
-          { label: 'Location', value: road?.location || inspection.location, width: 'half' },
+          { label: 'Location', value: road?.location || inspection.location, width: 'full' },
           { label: 'Date Started', value: road?.dateBuilt || inspection.dateStarted, width: 'half' },
           { label: 'Target Completion Date', value: road?.targetCompletionDate || inspection.targetCompletionDate, width: 'half' },
           { label: 'No. of Extensions', value: Number(road?.noOfExtensions || inspection.noOfExtensions) ? road?.noOfExtensions || inspection.noOfExtensions : '', width: 'half' },
@@ -1125,12 +1125,11 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                     {[
                       { label: 'Project / Program / Activity Name', value: projectName },
                       { label: 'Project Category', value: road?.projectCategory || road?.type || inspection.projectCategory || 'Local Road' },
-                      { label: 'Location', value: road?.location || inspection.location || '' },
-                      { label: 'Inspection Date', value: isPendingInspectionRecord(inspection) ? '' : inspection.date || '' },
-                    ].map(({ label, value }) => (
-                      <div key={label}>
+                      { label: 'Location', value: road?.location || inspection.location || '', fullWidth: true },
+                    ].map(({ label, value, fullWidth }) => (
+                      <div key={label} className={fullWidth ? 'md:col-span-2' : undefined}>
                         <span className="mb-2 block text-sm font-medium text-gray-700">{label}</span>
-                        <span className="block min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">{value}</span>
+                        <span className="block min-h-[3rem] whitespace-pre-wrap rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">{value}</span>
                       </div>
                     ))}
                   </div>
@@ -1162,7 +1161,8 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                         ['Inspection Type', isPendingInspectionRecord(inspection) ? '' : inspection.inspectionType || ''],
                         ['Integrity', `${score}%`],
                         ['Condition', condition],
-                        [inspection.isAnnualFollowUp || inspection.isScheduledAnnualFollowUp ? 'Follow-up Status' : 'Validation Status', isPendingInspectionRecord(inspection) ? 'Pending' : inspection.validationStatus || 'Pending Validation'],
+                        ['Inspection Date', isPendingInspectionRecord(inspection) ? '' : inspection.date || ''],
+                        ...(!inspection.isAnnualFollowUp && !inspection.isScheduledAnnualFollowUp ? [['Validation Status', isPendingInspectionRecord(inspection) ? 'Pending' : inspection.validationStatus || 'Pending Validation']] : []),
                       ].map(([label, value]) => (
                         <div key={label}><span className="mb-2 block text-sm font-medium text-gray-700">{label}</span><span className="block min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">{value}</span></div>
                       ))}

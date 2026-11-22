@@ -366,7 +366,7 @@ test('pending inspection view and print do not expose stale results', async () =
   const dialog=container.querySelector('.inspection-detail-dialog');
   const observation=[...dialog.querySelectorAll('p')].find(p=>p.textContent==='Observation Notes');
   assert.equal(observation.nextElementSibling.textContent.trim(),'');
-  for(const label of ['Condition','Follow-up Status']) {
+  for(const label of ['Condition']) {
     const el=[...dialog.querySelectorAll('span')].find(e=>e.textContent===label);
     assert.equal(el.nextElementSibling.textContent,'Pending');
   }
@@ -453,5 +453,34 @@ test('inspection details and print omit the submitted attachment section without
   assert.match(dialog.textContent,/assessment.jpg/);
   await act(async()=>[...dialog.querySelectorAll('button')].find(b=>b.textContent.includes('Print')).click());
   assert.equal(printedDocuments.at(-1).attachment,undefined);
+  act(()=>root.unmount());container.remove();
+});
+
+test('inspection view and print place full-width location above road information and dates in each follow-up detail', async () => {
+  const older={...pendingInspection,id:'old',isScheduledAnnualFollowUp:false,isAnnualFollowUp:true,annualFollowUpYear:2025,date:'2025-11-11',conditionRating:8};
+  const newer={...older,id:'new',annualFollowUpYear:2026,date:'2026-11-11'};
+  const {container,root}=renderModule([older,newer],'Head Engineer');
+  await act(async()=>container.querySelector('[aria-label^="View full inspection"]').click());
+  const dialog=container.querySelector('.inspection-detail-dialog');
+  const sections=[...dialog.querySelectorAll('section')];
+  const project=sections.find(section=>section.querySelector('h3')?.textContent==='Project Information');
+  const location=[...project.querySelectorAll('span')].find(span=>span.textContent==='Location');
+  assert.ok(location.parentElement.classList.contains('md:col-span-2'));
+  assert.doesNotMatch(project.textContent,/Inspection Date/);
+  const details=sections.filter(section=>section.querySelector('h3')?.textContent.startsWith('Inspection Details'));
+  assert.equal(details.length,2);
+  for (const [index, section] of details.entries()) {
+    assert.doesNotMatch(section.textContent,/Follow-up Status/);
+    const label=[...section.querySelectorAll('span')].find(span=>span.textContent==='Inspection Date');
+    assert.equal(label.nextElementSibling.textContent,['2025-11-11','2026-11-11'][index]);
+  }
+  await act(async()=>[...dialog.querySelectorAll('button')].find(button=>button.textContent.includes('Print')).click());
+  const print=printedDocuments.at(-1).sections;
+  const projectFields=print.find(section=>section.title==='Project Information').fields;
+  assert.equal(projectFields.find(field=>field.label==='Location').width,'full');
+  assert.ok(!projectFields.some(field=>field.label==='Inspection Date'));
+  const printDetails=print.filter(section=>section.title.startsWith('Inspection Details'));
+  assert.deepEqual(printDetails.map(section=>section.fields.find(field=>field.label==='Inspection Date').value),['2025-11-11','2026-11-11']);
+  assert.ok(printDetails.every(section=>!section.fields.some(field=>field.label==='Follow-up Status')));
   act(()=>root.unmount());container.remove();
 });
