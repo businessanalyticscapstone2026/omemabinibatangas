@@ -78,6 +78,20 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Preserve prior inspector read access
+- **Type:** Modified
+- **Files:** `MY-CHANGES.md` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Keep previously recorded inspections visible to their original inspector after reassignment, and prevent the current inspector from editing another inspector's recorded result.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-22 — [mine] Box annual validation results and list each inspection in overview
+- **Type:** Modified
+- **Files:** `src/app/components/InspectionModule.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Make validation status and remarks easier to read and retain a separate overview row and print entry for each completed follow-up.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Update validation history, date rules, and singleton staff roles
 - **Type:** Modified
 - **Files:** `src/app/api/auth/status/route.ts` (modified), `src/app/api/local-road/annual-validation/route.ts` (modified), `src/app/api/local-road/route.ts` (modified), `src/app/components/LocalRoadForm.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `src/app/components/UserManagementModule.tsx` (modified), `src/lib/project-validation-workflow.ts` (modified), `tests/password-boundaries.test.cjs` (modified), `tests/project-form.test.cjs` (modified), `tests/single-head-engineer.test.cjs` (modified), `tests/validation-workflow.test.cjs` (modified), `supabase/migrations/20261122_singleton_staff_roles.sql` (new)

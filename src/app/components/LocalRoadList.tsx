@@ -519,8 +519,14 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
             )}
             {validationMode && selectedValidationYear != null && <div className="border-t border-slate-200 pt-4 text-sm text-slate-700">
               <p className="font-semibold">Annual Follow-up {selectedValidationYear}</p>
-              <p>{selectedItem.annualValidationEntries?.find(entry => entry.year === selectedValidationYear)?.result || 'Pending'}</p>
-              <p className="whitespace-pre-wrap">{selectedItem.annualValidationEntries?.find(entry => entry.year === selectedValidationYear)?.remarks || ''}</p>
+              <div className="mt-4">
+                <p className="mb-2 font-medium">Validation Status</p>
+                <p className="min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3">{selectedItem.annualValidationEntries?.find(entry => entry.year === selectedValidationYear)?.result || 'Pending'}</p>
+              </div>
+              <div className="mt-4">
+                <p className="mb-2 font-medium">Validation Remarks</p>
+                <p className="min-h-[5rem] whitespace-pre-wrap rounded-lg border border-gray-300 bg-gray-100 px-4 py-3">{selectedItem.annualValidationEntries?.find(entry => entry.year === selectedValidationYear)?.remarks || ''}</p>
+              </div>
             </div>}
             {validationMode && selectedValidationYear === null && selectedItem.validationResult && <div className="border-t border-slate-200 pt-4 text-sm text-slate-700"><p className="font-semibold">Initial validation</p><p>{selectedItem.validationResult}</p><p className="whitespace-pre-wrap">{selectedItem.validationRemarks || ''}</p></div>}
             {validationMode && selectedValidationYear !== null && selectedValidationYear === validationTask(selectedItem)?.year && (

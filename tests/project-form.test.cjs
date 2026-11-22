@@ -588,7 +588,7 @@ test('validator reopens an updated returned project with an empty remarks input'
   await act(async () => container.querySelector('[aria-label="Open validation for Road 2001"]').click());
   assert.equal(container.querySelector('#validation-remarks').value, '');
   const detail = container.querySelector('.project-details-dialog');
-  assert.match(detail.textContent, /Annual Follow-up 2001Pending/);
+  assert.match(detail.textContent, /Annual Follow-up 2001Validation StatusPending/);
   assert.match(detail.textContent, /Previous revision remarks/); // History remains visible separately.
 });
 

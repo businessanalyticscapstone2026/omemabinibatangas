@@ -65,9 +65,16 @@ export async function GET(request: Request) {
     if (auth.profile.roleDb === 'inspector') {
       const roads = await listRoads(auth.db, auth.admin);
       const mine = new Set(roads.filter((road) => road.inspectorId === auth.userId).map((road) => road.id));
+      // The current assignee may read the project history. Former inspectors
+      // retain access to the records they recorded, even after reassignment.
+      const visible = (records: StoredRecord[]) => records
+        .filter(inspection => mine.has(String(inspection.localRoadId)) || inspection.inspectorId === auth.userId)
+        .map(inspection => ({ ...inspection,
+          canEdit: mine.has(String(inspection.localRoadId)) && (!inspection.inspectorId || inspection.inspectorId === auth.userId),
+        }));
       return withRefresh(NextResponse.json({
-        data: data.filter((inspection) => mine.has(String(inspection.localRoadId))),
-        archived: archived.filter((inspection) => mine.has(String(inspection.localRoadId))),
+        data: visible(data),
+        archived: visible(archived),
       }, { headers: { 'Cache-Control': 'private, no-store' } }), auth);
     }
     return withRefresh(NextResponse.json({ data, archived }), auth);
@@ -170,6 +177,7 @@ export async function PUT(request: Request) {
   if (notAssignedToInspector(auth, road)) {
     return NextResponse.json({ message: 'This project is not assigned to you.' }, { status: 403 });
   }
+  if (existing.inspectorId && existing.inspectorId !== auth.userId) return NextResponse.json({ message: 'Another inspector recorded this inspection; it is read-only.' }, { status: 403 });
   if (existing.isScheduledAnnualFollowUp && !annualYearIsValidated(road, existing.annualFollowUpYear)) return NextResponse.json({ message: 'The annual validation for this inspection year must be approved first.' }, { status: 409 });
   const minimum = earliestInspectionDate(road, payload, existing);
   if (!minimum) return NextResponse.json({ message: 'The project completion date could not be verified.' }, { status: 400 });

@@ -291,8 +291,7 @@ test('inspection overview follows history changes and pending annual cards keep 
       assert.equal(table.querySelectorAll('th').length, 4);
       assert.equal(container.querySelector('button[aria-label="Print inspection overview"]'), null);
     }
-    assert.deepEqual([...table.querySelectorAll('tbody td')].map(td=>td.textContent),['Poblacion Road','','','']);
-    assert.equal(table.querySelector('tbody tr td:last-child').colSpan,role === 'Head Engineer' ? 2 : 1);
+    assert.match(table.querySelector('tbody').textContent,/No inspections match/);
     await act(async()=>root.render(React.createElement(InspectionModule,{inspections:[{...pending,isScheduledAnnualFollowUp:false,conditionRating:6,conditionRatings:{Concrete:'Fair'},conditionRemarks:{Concrete:'Cracks'}}],localRoadList:[{id:'road-1',name:'Poblacion Road',contractedAmount:'1234567.5'}],onAddInspection(){},onEditInspection(){},onDeleteInspection(){},currentUser:'User',userRole:role})));
     table=container.querySelector('table'); assert.deepEqual([...table.querySelectorAll('tbody td')].map(td=>td.textContent),['Poblacion Road','2027-01-01','Php 1,234,567.50','Cracks.']);
     await act(async()=>tabs().find(el=>el.textContent.includes('Inspection History')).click()); assert.match(container.textContent,/Cracks/);
@@ -327,9 +326,8 @@ test('task 14: the inspection overview prints every record, or a single year', a
   const print = () => container.querySelector('button[aria-label="Print inspection overview"]');
   await act(async () => print().click());
   let sections = printedDocuments.at(-1).sections;
-  // Printing includes all visible rows; pending findings stay blank.
-  assert.deepEqual(sections.map(section => section.title).sort(), ['Anilao Road', 'Bagalangit Road', 'Poblacion Road']);
-  assert.equal(sections.find(section => section.title === 'Bagalangit Road').fields[2].value, '');
+  // Overview and its print list recorded results only.
+  assert.deepEqual(sections.map(section => section.title).sort(), ['Anilao Road', 'Poblacion Road']);
   assert.deepEqual(sections[0].fields.map(field => field.label), ['Date of Inspection', 'Amount Contracted', 'Findings / Remarks']);
 
   const year = container.querySelector('select[aria-label="Print inspection overview year"]');
@@ -407,4 +405,18 @@ test('inspection card and date use the validated annual year without a year sele
   const input=[...container.querySelectorAll('input[type=date]')].find(item=>item.required);
   assert.equal(input.min,'2024-07-06');
   act(()=>root.unmount()); container.remove();
+});
+
+
+test('inspection overview shows a separate row for each completed annual follow-up', async () => {
+  const first={id:'first',localRoadId:'road-1',localRoadName:'Poblacion Road',date:'2024-11-11',annualFollowUpYear:2024,conditionRatings:{Concrete:'Fair'},conditionRemarks:{Concrete:'Cracks'}};
+  const second={...first,id:'second',date:'2025-11-11',annualFollowUpYear:2025,conditionRatings:{Concrete:'Poor'},conditionRemarks:{Concrete:'Potholes'}};
+  const pending={...first,id:'third',date:'2026-11-11',annualFollowUpYear:2026,isScheduledAnnualFollowUp:true};
+  const {container,root}=renderModule([first,second,pending],'Head Engineer');
+  await act(async()=>[...container.querySelectorAll('[role=tab]')].find(el=>el.textContent.includes('Overview')).click());
+  const rows=[...container.querySelectorAll('[aria-label="Inspection Overview"] tbody tr')];
+  assert.equal(rows.length,2);assert.match(rows.map(row=>row.textContent).join(' '),/Cracks/);assert.match(rows.map(row=>row.textContent).join(' '),/Potholes/);
+  await act(async()=>container.querySelector('button[aria-label="Print inspection overview"]').click());
+  assert.equal(printedDocuments.at(-1).sections.length,2);
+  act(()=>root.unmount());container.remove();
 });

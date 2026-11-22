@@ -19,6 +19,7 @@ interface Inspection {
   conditionRating: number;
   remarks: string;
   inspector: string;
+  canEdit?: boolean;
   inspectionType?: string;
   conditionRatings?: Record<string, string>;
   // @mine 2026-11-11 — remark and files per category.
@@ -355,7 +356,12 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
     ? datedInspections.filter(inspection => !isPendingInspectionRecord(inspection) && inspection.date?.slice(0, 4) === overviewPrintYear)
     : datedInspections;
   const originalOrder = new Map(inspections.slice().reverse().map((inspection, index) => [inspection.id, index]));
-  const filteredInspections = inspectionCardsByValidation(yearInspections, localRoadList)
+  // Overview lists every recorded follow-up independently; the history tab
+  // retains its one-card-per-project workflow for the next inspection.
+  const visibleInspections = inspectionView === 'overview'
+    ? yearInspections.filter(inspection => !isPendingInspectionRecord(inspection))
+    : inspectionCardsByValidation(yearInspections, localRoadList);
+  const filteredInspections = visibleInspections
     .slice()
     .reverse()
     .map((inspection) => ({
@@ -1436,7 +1442,7 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                       {!isPendingInspection && inspection.date && <span className="flex shrink-0 items-center gap-1.5 text-sm text-slate-500">
                         <Calendar className="h-4 w-4" />{inspection.date}
                       </span>}
-                      {!isAdminReadDeleteOnly && <button
+                      {!isAdminReadDeleteOnly && inspection.canEdit !== false && <button
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
