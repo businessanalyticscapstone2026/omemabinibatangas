@@ -194,7 +194,7 @@ export async function PATCH(request: Request) {
       const result = String(payload.validationResult);
       const remarks = String(payload.validationRemarks);
       // @mine — only anniversary entries are actionable; legacy initial decisions remain untouched.
-      await saveAnnualValidation(auth.db, payload.id, task.year, result, remarks, auth.userId);
+      await saveAnnualValidation(auth.admin, payload.id, task.year, result, remarks, auth.userId);
       await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Validation Saved', details: `Saved ${task.year} annual validation for project ${String(current.projectName || current.name || payload.id)}` });
       // Email 2 (Validator → Encoder) or email 4 (Validator → Head Engineer), never both.
       await notifyWorkflow(auth.admin, {

@@ -611,6 +611,7 @@ export default function App() {
         const update = payload.roadUpdates?.find((item: { id: string }) => item.id === road.id);
         return update ? { ...road, condition: update.condition, lastInspection: update.lastInspection } : road;
       }));
+      window.dispatchEvent(new Event('local-road-records-changed'));
       return true;
     } catch (error) {
       console.error('Failed to update inspection.', error);

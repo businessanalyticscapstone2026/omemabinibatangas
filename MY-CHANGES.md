@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Queue inspector reassignment for validated later follow-ups
+- **Type:** Modified
+- **Files:** `package-lock.json` (modified), `package.json` (modified), `src/app/App.tsx` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/api/local-road/route.ts` (modified), `src/lib/supabase-data.ts` (modified), `tests/inspection-purpose.test.cjs` (modified), `tests/validation-workflow.test.cjs` (modified), `supabase/migrations/20261123_annual_inspector_queue.sql` (new), `tests/annual-inspector-queue.test.cjs` (new)
+- **What & why:** A later approved year requires a new assignment without interrupting earlier validated work or replacing inspection history.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Move inspection dates into follow-up details
 - **Type:** Modified
 - **Files:** `src/app/components/InspectionModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified)

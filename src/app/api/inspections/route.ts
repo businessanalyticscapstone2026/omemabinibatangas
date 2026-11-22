@@ -199,7 +199,7 @@ export async function PUT(request: Request) {
         return NextResponse.json({ message: 'This inspection date conflicts with linked maintenance dates.' }, { status: 409 });
       }
     }
-    const inspection = await saveInspection(auth.admin, { ...existing, ...payload, id: existing.id, annualFollowUpYear: existing.annualFollowUpYear, validationStatus: existing.validationStatus }, road.id, auth.userId);
+    const inspection = await saveInspection(auth.admin, { ...existing, ...payload, id: existing.id, annualFollowUpYear: existing.annualFollowUpYear, validationStatus: existing.validationStatus }, road.id, auth.userId, existing.isScheduledAnnualFollowUp === true);
     await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Inspection Updated', details: `Updated inspection ${inspection.id}` });
     // This flag is read from the stored row, never trusted from the request.
     // Scheduled placeholders exist before any results have been recorded.
