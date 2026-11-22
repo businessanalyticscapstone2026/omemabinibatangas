@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sparkles, Loader2, CheckCircle } from 'lucide-react';
+import { findingsSummary } from '@/lib/inspection-selection';
 
 export interface PredictionResult {
   localRoadId: string;
@@ -19,6 +20,7 @@ interface AIPredictionModuleProps {
   inspections: any[];
   predictions: PredictionResult[];
   onPredictionsChange: (predictions: PredictionResult[]) => void;
+  recommendationsLoaded?: boolean;
 }
 
 const actionableRatings = new Set(['Fair', 'Poor', 'Bad']);
@@ -29,7 +31,8 @@ function isActionableAssessment(assessment: Record<string, string> | undefined):
 
 function inspectionFingerprint(inspection: any): string {
   return JSON.stringify([inspection.id || '', inspection.date || '', inspection.conditionRating ?? null,
-    Object.entries(inspection.conditionRatings || {}).sort(([a], [b]) => a.localeCompare(b)), inspection.remarks || '']);
+    Object.entries(inspection.conditionRatings || {}).sort(([a], [b]) => a.localeCompare(b)),
+    Object.entries(inspection.conditionRemarks || {}).sort(([a], [b]) => a.localeCompare(b)), inspection.remarks || '']);
 }
 
 export function AIPredictionModule({
@@ -37,6 +40,7 @@ export function AIPredictionModule({
   inspections,
   predictions,
   onPredictionsChange,
+  recommendationsLoaded = true,
 }: AIPredictionModuleProps) {
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -60,7 +64,7 @@ export function AIPredictionModule({
     const inspection = latestInspectionByRoadId.get(road.id);
     if (!inspection || !isActionableAssessment(inspection.conditionRatings)) return [];
     const prediction = predictions.find(item => item.localRoadId === road.id);
-    const stale = !!prediction && (prediction.inspectionFingerprint ? prediction.inspectionFingerprint !== inspectionFingerprint(inspection) : !!prediction.lastInspection && prediction.lastInspection !== 'N/A' && prediction.lastInspection !== String(inspection.date || ''));
+    const stale = !!prediction && prediction.inspectionFingerprint !== inspectionFingerprint(inspection);
     return [{ road, inspection, prediction, stale }];
   }).sort((a, b) => (b.prediction?.priorityScore ?? -1) - (a.prediction?.priorityScore ?? -1));
 
@@ -71,75 +75,70 @@ export function AIPredictionModule({
     'Displaying results'
   ];
 
-  const generatePredictions = async () => {
+  const attempted = useRef(new Set<string>());
+  const inFlight = useRef(false);
+  const state = useRef({ rows, predictions, onPredictionsChange });
+  state.current = { rows, predictions, onPredictionsChange };
+  const missingSignature = JSON.stringify(rows.filter(row => !row.prediction || row.stale)
+    .map(row => [row.road.id, inspectionFingerprint(row.inspection)]));
+
+  const generatePredictions = async (force = false) => {
+    if (inFlight.current) return;
+    const selected = state.current.rows.filter(({road, inspection, prediction, stale}) => {
+      const key = JSON.stringify([road.id, inspectionFingerprint(inspection)]);
+      return force || ((!prediction || stale) && !attempted.current.has(key));
+    }).slice(0, 200);
+    if (!selected.length) return;
+    for (const {road, inspection} of selected) attempted.current.add(JSON.stringify([road.id, inspectionFingerprint(inspection)]));
+    inFlight.current = true;
     setErrorMessage('');
     setLoading(true);
     setCurrentStep(0);
-
     try {
-      const items = localRoadData.flatMap((road) => {
-        const inspection = latestInspectionByRoadId.get(road.id);
-        if (!inspection || !isActionableAssessment(inspection.conditionRatings)) return [];
-
-        return [{
-          id: road.id,
-          name: road.projectName || road.name,
-          type: road.projectCategory || road.type,
-          condition: road.condition,
-          dateBuilt: road.dateBuilt || '',
-          lastInspection: String(inspection.date || ''),
-          inspectionFingerprint: inspectionFingerprint(inspection),
-          inspections: [{
-            date: String(inspection.date || ''),
-            conditionRating: Number(inspection.conditionRating),
-            assessment: inspection.conditionRatings || {},
-            inspectionFindings: String(inspection.remarks || ''),
-          }],
-        }];
-      });
-      if (items.length === 0) {
-        throw new Error('No projects have a Fair, Poor, or Bad rating in their latest completed inspection. Projects rated only Good or N/A are not included.');
-      }
+      // Capture the exact inspection sent to the model, so a response arriving
+      // after a newer inspection cannot be mislabeled as current.
+      const items = selected.map(({road, inspection}) => ({
+        id: road.id, name: String(road.projectName || road.name || ''), type: String(road.projectCategory || road.type || ''),
+        condition: String(road.condition || ''), dateBuilt: String(road.dateBuilt || ''), lastInspection: String(inspection.date || ''),
+        inspectionFingerprint: inspectionFingerprint(inspection),
+        inspections: [{ date: String(inspection.date || ''), conditionRating: Number(inspection.conditionRating),
+          assessment: inspection.conditionRatings || {}, inspectionFindings: findingsSummary(inspection.conditionRatings || {}, inspection.conditionRemarks || {}) || String(inspection.remarks || '') }],
+      }));
       setCurrentStep(1);
-
       const response = await fetch('/api/ai-priority', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }),
       });
       const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.message || 'Unable to generate recommendations.');
-      }
-      if (!Array.isArray(payload?.data)) {
-        throw new Error('The AI service returned an invalid response.');
-      }
-
+      if (!response.ok) throw new Error(payload?.message || 'Unable to generate recommendations.');
+      if (!Array.isArray(payload?.data) || payload.data.length !== items.length) throw new Error('The AI service returned an invalid response.');
       setCurrentStep(2);
+      const seen = new Set<string>();
       const results: PredictionResult[] = payload.data.map((prediction: any) => {
-        const road = localRoadData.find((item) => item.id === prediction.localRoadId);
-        if (!road) throw new Error('The AI service returned a recommendation for an unknown road.');
-        return {
-          localRoadId: road.id,
-          localRoadName: road.projectName || road.name,
-          type: road.projectCategory || road.type,
-          lastInspection: String(latestInspectionByRoadId.get(road.id)?.date || 'N/A'),
-          inspectionFingerprint: inspectionFingerprint(latestInspectionByRoadId.get(road.id)),
-          condition: road.condition,
-          riskLevel: prediction.riskLevel,
-          priorityScore: prediction.priorityScore,
-          justification: prediction.justification,
-          recommendation: prediction.recommendation,
-        };
+        const item = items.find(item => item.id === prediction.localRoadId);
+        if (!item || seen.has(item.id)) throw new Error('The AI service returned an invalid project.');
+        seen.add(item.id);
+        return { localRoadId: item.id, localRoadName: item.name, type: item.type,
+          lastInspection: item.lastInspection || 'N/A', inspectionFingerprint: item.inspectionFingerprint,
+          condition: item.condition, riskLevel: prediction.riskLevel, priorityScore: prediction.priorityScore,
+          justification: prediction.justification, recommendation: prediction.recommendation };
       });
       setCurrentStep(3);
-      onPredictionsChange(results);
+      const replaced = new Set(results.map(result => result.localRoadId));
+      state.current.onPredictionsChange([...state.current.predictions.filter(item => !replaced.has(item.localRoadId)), ...results]);
+      if (payload.persistenceWarning) setErrorMessage(payload.persistenceWarning);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to generate recommendations.');
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (recommendationsLoaded && !loading) void generatePredictions();
+    // This signature changes only when a project/inspection needs a result.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingSignature, recommendationsLoaded, loading]);
 
   return (
     <div className="p-6 space-y-6 bg-[#E3EEF9] min-h-screen">
@@ -148,7 +147,7 @@ export function AIPredictionModule({
           <h1 className="text-xl font-semibold tracking-tight text-blue-700">AI Maintenance Recommendation</h1>
         </div>
         <button
-          onClick={generatePredictions}
+          onClick={() => void generatePredictions(true)}
           disabled={loading || rows.length === 0}
           className={`flex items-center gap-2 rounded-2xl px-5 py-3 font-semibold shadow-md transition hover:brightness-105 ${
             loading || rows.length === 0
@@ -157,7 +156,7 @@ export function AIPredictionModule({
           }`}
         >
           <Sparkles className="w-5 h-5" />
-          {predictions.length > 0 ? 'Regenerate' : 'Generate Recommendations'}
+          {errorMessage ? 'Retry' : predictions.length > 0 ? 'Regenerate' : 'Generate Recommendations'}
         </button>
       </div>
 
@@ -196,7 +195,7 @@ export function AIPredictionModule({
       )}
 
       {/* Results State */}
-      {!loading && (
+      {(
         <>
           <div className="min-w-0 max-w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full min-w-[900px] border-separate border-spacing-0 text-left">
@@ -211,8 +210,8 @@ export function AIPredictionModule({
                     <td className="px-6 py-4 font-medium text-[#0ea5e9]">{road.projectName || road.name || 'N/A'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{road.projectCategory || road.type || 'N/A'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{condition}</td>
-                    <td className="whitespace-pre-line px-6 py-4 text-sm leading-6 text-slate-700">{prediction ? <>{prediction.justification.replace(/\s*(Inspection findings:)/i, '\n$1')}{stale && <span className="mt-2 block text-amber-700">Based on an older inspection. Regenerate to update.</span>}</> : <span className="text-slate-500">Not generated yet</span>}</td>
-                    <td className="px-6 py-4 text-sm leading-6 text-slate-700">{prediction ? prediction.recommendation : <span className="text-slate-500">Not generated yet</span>}</td>
+                    <td className="whitespace-pre-line px-6 py-4 text-sm leading-6 text-slate-700">{prediction ? <>{prediction.justification.replace(/\s*(Inspection findings:)/i, '\n$1')}{stale && <span className="mt-2 block text-amber-700">{errorMessage ? 'Update failed. Retry to refresh.' : 'Updating from the latest inspection.'}</span>}</> : <span className="text-slate-500">{errorMessage ? 'Not generated. Retry to generate.' : 'Generating recommendation…'}</span>}</td>
+                    <td className="px-6 py-4 text-sm leading-6 text-slate-700">{prediction ? prediction.recommendation : <span className="text-slate-500">{errorMessage ? 'Not generated. Retry to generate.' : 'Generating recommendation…'}</span>}</td>
                   </tr>;
                 })}
                 {rows.length === 0 && <tr><td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-600">No projects have a Fair, Poor, or Bad rating in their latest completed inspection. Projects rated only Good or N/A are not shown.</td></tr>}
@@ -222,7 +221,7 @@ export function AIPredictionModule({
 
           {/* Footer */}
           <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-500 text-center">
-            New eligible inspections appear automatically. Generate or regenerate to update AI justification and recommended maintenance activity.
+            Recommendations are generated automatically for new or updated eligible inspections.
           </div>
         </>
       )}

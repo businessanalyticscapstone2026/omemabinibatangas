@@ -1066,43 +1066,58 @@ test('returned validation status shows the year in the badge and a bold header',
 });
 
 test('AI recommendations render project data in a prioritized table', async () => {
-  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx');
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', {'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts')});
   const roads=[{id:'a',name:'Road A',projectName:'Project Alpha',projectCategory:'Local Road'}, {id:'b',name:'Road B',projectName:'Project Beta',projectCategory:'Bridge'}];
   const inspections=roads.map(r=>({localRoadId:r.id,date:'2026-01-01',conditionRatings:{Concrete:'Fair'}}));
-  const predictions=roads.map((r,i)=>({localRoadId:r.id,localRoadName:r.name,type:'Wrong category',condition:'Fair',priorityScore:i+1,justification:'Cracks',recommendation:'Repair'}));
+  const predictions=roads.map((r,i)=>({localRoadId:r.id,localRoadName:r.name,type:'Wrong category',condition:'Fair',priorityScore:i+1,justification:'Cracks',recommendation:'Repair',inspectionFingerprint:JSON.stringify(['', '2026-01-01',null,[['Concrete','Fair']],[],''])}));
   await reset();await act(async()=>root.render(React.createElement(AIPredictionModule,{localRoadData:roads,inspections,predictions,onPredictionsChange(){}})));
   assert.deepEqual([...container.querySelectorAll('th')].map(x=>x.textContent),['Project Name','Category','Condition','AI Justification','Recommended Maintenance Activity']);
   const rows=[...container.querySelectorAll('tbody tr')];assert.equal(rows.length,2);assert.deepEqual([...rows[0].cells].map(x=>x.textContent),['Project Beta','Bridge','Fair','Cracks','Repair']);
   await reset();
 });
 
-test('AI table automatically shows eligible inspected projects without generating, and marks older AI results', async () => {
-  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx');
-  const roads=[{id:'a',name:'First',condition:'Fair'}, {id:'b',name:'New',condition:'Poor'}, {id:'c',name:'Good',condition:'Good'}];
+test('AI generates only missing or changed inspections automatically and retains other results', async () => {
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', {'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts')});
+  const roads=[{id:'a',name:'First',condition:'Fair'}, {id:'b',name:'New',condition:'Poor'}];
   let inspections=[{id:'i1',localRoadId:'a',date:'2026-01-01',conditionRatings:{Concrete:'Fair'},conditionRating:6}];
+  const fingerprint=JSON.stringify(['i1','2026-01-01',6,[['Concrete','Fair']],[],'']);
   const calls=[]; const previousFetch=global.fetch;
-  global.fetch=async (...args)=>{ calls.push(args); throw new Error('unexpected request'); };
+  global.fetch=async (_url,options)=>{const body=JSON.parse(options.body);calls.push(body);return {ok:true,json:async()=>({data:body.items.map(item=>({localRoadId:item.id,riskLevel:'Medium',priorityScore:50,justification:`Reason ${item.id}`,recommendation:`Repair ${item.id}`}))})};};
+  function Harness({records}) {const [predictions,setPredictions]=React.useState([{localRoadId:'a',condition:'Fair',priorityScore:20,inspectionFingerprint:fingerprint,justification:'Existing reason',recommendation:'Existing repair'}]); return React.createElement(AIPredictionModule,{localRoadData:roads,inspections:records,predictions,onPredictionsChange:setPredictions});}
   try {
-    await reset();
-    const render=async (predictions=[])=>act(async()=>root.render(React.createElement(AIPredictionModule,{localRoadData:roads,inspections,predictions,onPredictionsChange(){}})));
-    await render();
-    assert.match(container.textContent,/First/);assert.match(container.textContent,/Not generated yet/);assert.equal(calls.length,0);
-    inspections=[...inspections,{id:'i2',localRoadId:'b',date:'2026-02-01',conditionRatings:{Concrete:'Poor'},conditionRating:3},{localRoadId:'c',date:'2026-02-01',conditionRatings:{Concrete:'Good'}},{localRoadId:'b',date:'2027-01-01',isScheduledAnnualFollowUp:true,conditionRatings:{Concrete:'Bad'}}];
-    await render([{localRoadId:'a',condition:'Fair',priorityScore:20,lastInspection:'2025-01-01',justification:'Earlier assessment',recommendation:'Repair'}]);
-    assert.match(container.textContent,/New/);assert.doesNotMatch(container.textContent,/Good/);assert.match(container.textContent,/Earlier assessment/);assert.match(container.textContent,/Based on an older inspection/);assert.equal(calls.length,0);
-    assert.equal(container.querySelectorAll('tbody tr').length,2);
+    await reset(); await act(async()=>root.render(React.createElement(Harness,{records:inspections})));
+    assert.equal(calls.length,0);
+    inspections=[...inspections,{id:'i2',localRoadId:'b',date:'2026-02-01',conditionRatings:{Concrete:'Poor'},conditionRating:3}];
+    await act(async()=>root.render(React.createElement(Harness,{records:inspections})));
+    assert.equal(calls.length,1); assert.deepEqual(calls[0].items.map(item=>item.id),['b']);
+    assert.match(container.textContent,/Existing reason/); assert.match(container.textContent,/Reason b/); assert.match(container.textContent,/Repair b/);
+    inspections=[...inspections,{id:'i3',localRoadId:'a',date:'2027-01-01',conditionRatings:{Concrete:'Bad'},conditionRating:2,remarks:'New cracks'}];
+    await act(async()=>root.render(React.createElement(Harness,{records:inspections})));
+    assert.equal(calls.length,2);assert.deepEqual(calls[1].items.map(item=>item.id),['a']);assert.match(container.textContent,/Reason a/);assert.match(container.textContent,/Reason b/);
+  } finally {global.fetch=previousFetch;await reset();}
+});
+
+test('automatic recommendation failure is visible and retry does not loop', async () => {
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', {'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts')});
+  const roads=[{id:'a',name:'Road',condition:'Fair'}], inspections=[{id:'i',localRoadId:'a',date:'2026-01-01',conditionRating:6,conditionRatings:{Concrete:'Fair'}}];
+  let calls=0;const previousFetch=global.fetch;
+  global.fetch=async()=>{calls++;return {ok:false,json:async()=>({message:'AI service unavailable'})};};
+  try {
+    await reset();await act(async()=>root.render(React.createElement(AIPredictionModule,{localRoadData:roads,inspections,predictions:[],onPredictionsChange(){}})));
+    assert.equal(calls,1);assert.match(container.textContent,/AI service unavailable/);assert.match(container.textContent,/Not generated/);
+    await act(async()=>[...container.querySelectorAll('button')].find(button=>button.textContent.includes('Retry')).click());
+    assert.equal(calls,2);
   } finally {global.fetch=previousFetch;await reset();}
 });
 
 test('AI generation uses latest eligible inspection dates and stores the inspection fingerprint', async () => {
-  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx');
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', {'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts')});
   const roads=[{id:'a',name:'Road',condition:'Fair',lastInspection:'2024-01-01'}];
   const inspections=[{id:'i',localRoadId:'a',date:'2026-01-01',conditionRatings:{Concrete:'Fair'},conditionRating:6,remarks:'Crack'}];
   let requestBody,saved; const previousFetch=global.fetch;
   global.fetch=async (_url,options)=>{requestBody=JSON.parse(options.body);return {ok:true,json:async()=>({data:[{localRoadId:'a',riskLevel:'Medium',priorityScore:50,justification:'Cracks',recommendation:'Repair'}]})};};
   try {
     await reset(); await act(async()=>root.render(React.createElement(AIPredictionModule,{localRoadData:roads,inspections,predictions:[],onPredictionsChange:results=>{saved=results;}})));
-    await act(async()=>[...container.querySelectorAll('button')].find(button=>button.textContent.includes('Generate Recommendations')).click());
     assert.equal(requestBody.items[0].lastInspection,'2026-01-01');
     assert.ok(requestBody.items[0].inspectionFingerprint.includes('Crack'));
     assert.equal(saved[0].inspectionFingerprint,requestBody.items[0].inspectionFingerprint);
@@ -1148,4 +1163,18 @@ test('maintenance details and print contain earlier and later activity for the p
   await act(async()=>[...detail.querySelectorAll('button')].find(b=>b.textContent.includes('Print')).click());
   const sections=printed.at(-1).sections.filter(s=>s.title.startsWith('Maintenance Activity Information'));assert.equal(sections.length,2);assert.match(JSON.stringify(sections[0]),/Old repair/);assert.match(JSON.stringify(sections[1]),/New repair/);assert.doesNotMatch(JSON.stringify(sections),/Budget/);
   await reset();
+});
+
+test('AI waits for saved recommendations before deciding whether automatic generation is needed', async () => {
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx',{'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts')});
+  const roads=[{id:'a',name:'Road',condition:'Fair'}], inspections=[{id:'i',localRoadId:'a',date:'2026-01-01',conditionRating:6,conditionRatings:{Concrete:'Fair'}}];
+  let calls=0;const previousFetch=global.fetch;global.fetch=async()=>{calls++;throw Error('unexpected');};
+  const fingerprint=JSON.stringify(['i','2026-01-01',6,[['Concrete','Fair']],[],'']);
+  try {
+    await reset(); await act(async()=>root.render(React.createElement(AIPredictionModule,{localRoadData:roads,inspections,predictions:[],recommendationsLoaded:false,onPredictionsChange(){}})));
+    assert.equal(calls,0);
+    const prediction={localRoadId:'a',condition:'Fair',priorityScore:10,inspectionFingerprint:fingerprint,justification:'Saved reason',recommendation:'Saved activity'};
+    await act(async()=>root.render(React.createElement(AIPredictionModule,{localRoadData:roads,inspections,predictions:[prediction],recommendationsLoaded:true,onPredictionsChange(){}})));
+    assert.equal(calls,0);assert.match(container.textContent,/Saved reason/);
+  } finally {global.fetch=previousFetch;await reset();}
 });

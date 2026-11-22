@@ -43,6 +43,7 @@ export async function POST(request: Request) {
     const prioritized = await prioritizeMaintenance(body.items);
     // @mine — persist the run so recommendations survive across browsers/users.
     // Best-effort: a persistence failure must not fail the generation itself.
+    let persistenceWarning: string | undefined;
     try {
       const items = Array.isArray(body.items) ? body.items : [];
       const factorsByProjectId: Record<string, Record<string, unknown>> = {};
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
       });
     } catch (persistError) {
       console.error('Failed to persist AI recommendations.', persistError);
+      persistenceWarning = 'Recommendations were generated but could not be saved for other users. Please retry.';
     }
     return NextResponse.json({ success: true, data: prioritized });
   } catch (error) {

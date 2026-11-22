@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Generate AI recommendations automatically for new inspections
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/api/ai-priority/route.ts` (modified), `src/app/components/AIPredictionModule.tsx` (modified), `src/lib/supabase-data.ts` (modified), `tests/project-form.test.cjs` (modified), `tests/ai-persistence.test.cjs` (new)
+- **What & why:** Keep each eligible project's justification and maintenance activity current without regenerating unrelated results.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Require first follow-up results before later validation
 - **Type:** Modified
 - **Files:** `src/app/api/local-road/route.ts` (modified), `tests/validation-workflow.test.cjs` (modified), `supabase/migrations/20261124_first_followup_validation_gate.sql` (new), `tests/first-followup-validation-gate.test.cjs` (new)
