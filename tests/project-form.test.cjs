@@ -1136,3 +1136,16 @@ test('validator sees only selected follow-up remarks, not another year', async (
   assert.doesNotMatch(container.querySelector('.project-details-dialog').textContent,/Other year only/);
   await reset();
 });
+
+test('maintenance details and print contain earlier and later activity for the project', async () => {
+  const printed=[];const Dummy=({children})=>React.createElement(React.Fragment,null,children);const ui=new Proxy({}, {get:()=>Dummy});
+  const {MaintenanceModule}=loadTs('src/app/components/MaintenanceModule.tsx',{'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts'),'@/lib/project-form-validation':validation,'./ui/textarea':ui,'./ui/dialog':{...ui,Dialog:Dummy,DialogContent:({children,className})=>React.createElement('div',{className},children),DialogTitle:Dummy,DialogDescription:Dummy},'./ui/select':ui,'./ConfirmActionDialog':ui,'./PrintDocument':{PrintDocument:props=>{printed.push(props);return null;}},'@/lib/activity-log-client':{recordClientActivity:async()=>{}}});
+  const records=[{id:'old',inspectionId:'i1',localRoadId:'p',localRoadName:'Road',status:'Completed',type:'Corrective',scheduledDate:'2024-12-01',dateStarted:'2024-11-30',completedDate:'2024-12-01',description:'Old repair',remarks:'Old remark',cost:0},{id:'new',inspectionId:'i2',localRoadId:'p',localRoadName:'Road',status:'In Progress',type:'Corrective',scheduledDate:'2025-12-01',dateStarted:'2025-11-30',description:'New repair',remarks:'New remark',cost:0}];
+  const inspections=[{id:'i1',annualFollowUpYear:2024},{id:'i2',annualFollowUpYear:2025}];
+  await reset();await act(async()=>root.render(React.createElement(MaintenanceModule,{maintenanceRecords:records,localRoadList:[{id:'p',name:'Road'}],inspections,userRole:'Head Engineer',currentUser:'User',onAddMaintenance(){},onEditMaintenance(){},onDeleteMaintenance(){},onUpdateStatus(){}})));
+  await act(async()=>container.querySelector('[aria-label="View maintenance details for Road"]').click());
+  const detail=container.querySelector('.maintenance-detail-dialog');assert.ok(detail.textContent.indexOf('Old repair')<detail.textContent.indexOf('New repair'));
+  await act(async()=>[...detail.querySelectorAll('button')].find(b=>b.textContent.includes('Print')).click());
+  const sections=printed.at(-1).sections.filter(s=>s.title.startsWith('Maintenance Activity Information'));assert.equal(sections.length,2);assert.match(JSON.stringify(sections[0]),/Old repair/);assert.match(JSON.stringify(sections[1]),/New repair/);
+  await reset();
+});

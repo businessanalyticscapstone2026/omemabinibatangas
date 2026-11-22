@@ -454,13 +454,14 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
   const startEditingInspection = (inspection: Inspection) => {
     const road = localRoadList.find((item) => item.id === inspection.localRoadId);
     const overallRating = getConditionLabel(inspection);
+    const pending = isPendingInspectionRecord(inspection);
     setEditingInspection(inspection);
-    setConditionRatings(inspection.conditionRatings || Object.fromEntries(
+    setConditionRatings(pending ? {} : inspection.conditionRatings || Object.fromEntries(
       conditionAssessmentLabels.map((label) => [label, overallRating === 'Pending Validation' ? 'N/A' : overallRating]),
     ));
-    // @mine 2026-11-11 — restore the per-category remark and file sets.
-    setConditionRemarks(inspection.conditionRemarks || {});
-    setConditionAttachments(inspection.conditionAttachments || {});
+    // A new annual inspection never inherits another result's assessment.
+    setConditionRemarks(pending ? {} : inspection.conditionRemarks || {});
+    setConditionAttachments(pending ? {} : inspection.conditionAttachments || {});
     setCategoryNotice('');
     setFormData((previous) => ({
       ...previous,
@@ -480,9 +481,9 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
       components: road?.components || inspection.components || '',
       description: road?.description || inspection.description || '',
       date: isPendingInspectionRecord(inspection) ? '' : inspection.date,
-      inspectionType: inspection.inspectionType === 'Monitoring and Maintenance Inspection' ? inspection.inspectionType : '',
-      conditionRating: String(inspection.conditionRating),
-      remarks: inspection.remarks || '',
+      inspectionType: !pending && inspection.inspectionType === 'Monitoring and Maintenance Inspection' ? inspection.inspectionType : '',
+      conditionRating: pending ? '' : String(inspection.conditionRating),
+      remarks: pending ? '' : inspection.remarks || '',
     }));
     setValidationNotice('');
     setActiveFormTab('project');
@@ -579,18 +580,15 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
     }
   };
 
+  // Completed results are immutable history for display. Include the selected
+  // pending row as an empty next section, but never reveal other pending years.
+  const inspectionHistoryFor = (selected: Inspection): Inspection[] => inspections
+    .filter(item => item.localRoadId === selected.localRoadId && (item.id === selected.id || !isPendingInspectionRecord(item)))
+    .slice().sort((a, b) => (a.annualFollowUpYear || Number(a.date?.slice(0, 4)) || 0) - (b.annualFollowUpYear || Number(b.date?.slice(0, 4)) || 0) || String(a.date || '').localeCompare(String(b.date || '')) || a.id.localeCompare(b.id));
+
   const printInspection = (inspection: Inspection, referenceId: string) => {
     const road = localRoadList.find((item) => item.id === inspection.localRoadId);
     const projectName = road?.projectName || road?.name || inspection.projectName || inspection.localRoadName;
-    // @mine 2026-11-11 — the printed assessment carries each category's remark.
-    const assessmentFields = inspectionCategories.map(({ label }) => {
-      const rating = inspection.conditionRatings?.[label];
-      const remark = inspection.conditionRemarks?.[label];
-      return {
-        label,
-        value: [rating || 'Not assessed', remark ? `Remarks: ${remark}` : ''].filter(Boolean).join(' — '),
-      };
-    });
     void recordClientActivity(
       currentUser,
       'Print Requested',
@@ -620,27 +618,21 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
           { label: 'Description', value: road?.description || inspection.description, width: 'full' },
         ],
       },
-      {
-        title: 'Inspector Information',
-        fields: [
-          { label: 'Inspection Date', value: isPendingInspectionRecord(inspection) ? '' : inspection.date, width: 'half' },
-          { label: 'Inspection Type', value: inspection.inspectionType, width: 'half' },
-        ],
-      },
-      {
-        title: 'Local Road Condition Assessment',
-        fields: assessmentFields,
-      },
-      {
-        title: 'Inspection Findings',
-        fields: [{ label: 'Findings', value: isPendingInspectionRecord(inspection) ? '' : findingsSummary(inspection.conditionRatings || {}, inspection.conditionRemarks || {}) || inspection.remarks }],
-      },
-      {
-        title: 'Prepared by',
-        fields: [
-          { label: 'Site Inspector', value: inspection.inspector },
-        ],
-      },
+      ...inspectionHistoryFor(inspection).flatMap((item) => {
+        const pending = isPendingInspectionRecord(item);
+        const label = item.annualFollowUpYear ? ` · Annual Follow-up ${item.annualFollowUpYear}` : '';
+        return [
+          { title: `Inspection Details${label}`, fields: [
+            { label: 'Inspection Date', value: pending ? '' : item.date, width: 'half' as const },
+            { label: 'Inspection Type', value: pending ? '' : item.inspectionType, width: 'half' as const },
+            { label: 'Inspector', value: pending ? '' : item.inspector, width: 'half' as const },
+          ] },
+          { title: `Local Road Condition Assessment${label}`, fields: inspectionCategories.map(({label}) => ({
+            label, value: pending ? '' : [item.conditionRatings?.[label] || 'Not assessed', item.conditionRemarks?.[label] ? `Remarks: ${item.conditionRemarks[label]}` : ''].filter(Boolean).join(' — '),
+          })) },
+          { title: `Inspection Findings${label}`, fields: [{ label: 'Findings', value: pending ? '' : findingsSummary(item.conditionRatings || {}, item.conditionRemarks || {}) || item.remarks }] },
+        ];
+      }),
     ]);
     setSelectedInspection(null);
   };
@@ -1122,11 +1114,6 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
         >
           {selectedInspection && (() => {
             const { inspection, referenceId } = selectedInspection;
-            const score = Math.round(getRatingScore(inspection.conditionRating) * 10);
-            const details = Object.entries(inspection.conditionRatings || {})
-              .filter(([, value]) => value !== 'N/A');
-            const defects = details.filter(([, value]) => value === 'Fair' || value === 'Poor' || value === 'Bad');
-            const condition = isPendingInspectionRecord(inspection) ? 'Pending' : getConditionLabel(inspection);
             const road = localRoadList.find((item) => item.id === inspection.localRoadId);
             const projectName = road?.projectName || road?.name || inspection.projectName || inspection.localRoadName;
 
@@ -1166,8 +1153,14 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                     </div>
                   </section>
 
+                  {inspectionHistoryFor(inspection).map((inspection) => {
+                    const score = Math.round(getRatingScore(inspection.conditionRating) * 10);
+                    const details = Object.entries(inspection.conditionRatings || {}).filter(([, value]) => value !== 'N/A');
+                    const defects = details.filter(([, value]) => value === 'Fair' || value === 'Poor' || value === 'Bad');
+                    const condition = isPendingInspectionRecord(inspection) ? 'Pending' : getConditionLabel(inspection);
+                    return <Fragment key={inspection.id}>
                   <section className="border-b pb-6">
-                    <h3 className="mb-4 text-lg font-semibold text-gray-900">Inspection Details</h3>
+                    <h3 className="mb-4 text-lg font-semibold text-gray-900">{`Inspection Details${inspection.annualFollowUpYear ? ` · Annual Follow-up ${inspection.annualFollowUpYear}` : ''}`}</h3>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       {[
                         ['Inspector', inspection.inspector || ''],
@@ -1305,6 +1298,8 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                       </p>
                     )}
                   </section>
+                    </Fragment>;
+                  })}
                   {canPrint && (
                     <div className="flex justify-end border-t border-slate-200 pt-5">
                       <button type="button" onClick={() => printInspection(inspection, referenceId)} className="inline-flex items-center gap-2 rounded-md bg-blue-700 px-5 py-2 text-sm font-medium text-white hover:bg-blue-800">

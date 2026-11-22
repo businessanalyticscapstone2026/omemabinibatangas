@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Preserve follow-up history in inspection and maintenance details
+- **Type:** Modified
+- **Files:** `src/app/components/InspectionModule.tsx` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
+- **What & why:** Show and print each year's recorded inspection and maintenance activity in order, and start new inspection forms without previous answers.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Preserve prior inspector read access
 - **Type:** Modified
 - **Files:** `MY-CHANGES.md` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `src/app/components/LocalRoadList.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/project-form.test.cjs` (modified)
