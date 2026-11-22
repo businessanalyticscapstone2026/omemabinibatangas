@@ -1144,8 +1144,8 @@ test('maintenance details and print contain earlier and later activity for the p
   const inspections=[{id:'i1',annualFollowUpYear:2024},{id:'i2',annualFollowUpYear:2025}];
   await reset();await act(async()=>root.render(React.createElement(MaintenanceModule,{maintenanceRecords:records,localRoadList:[{id:'p',name:'Road'}],inspections,userRole:'Head Engineer',currentUser:'User',onAddMaintenance(){},onEditMaintenance(){},onDeleteMaintenance(){},onUpdateStatus(){}})));
   await act(async()=>container.querySelector('[aria-label="View maintenance details for Road"]').click());
-  const detail=container.querySelector('.maintenance-detail-dialog');assert.ok(detail.textContent.indexOf('Old repair')<detail.textContent.indexOf('New repair'));
+  const detail=container.querySelector('.maintenance-detail-dialog');assert.ok(detail.textContent.indexOf('Old repair')<detail.textContent.indexOf('New repair'));assert.doesNotMatch(detail.textContent,/Budget/);
   await act(async()=>[...detail.querySelectorAll('button')].find(b=>b.textContent.includes('Print')).click());
-  const sections=printed.at(-1).sections.filter(s=>s.title.startsWith('Maintenance Activity Information'));assert.equal(sections.length,2);assert.match(JSON.stringify(sections[0]),/Old repair/);assert.match(JSON.stringify(sections[1]),/New repair/);
+  const sections=printed.at(-1).sections.filter(s=>s.title.startsWith('Maintenance Activity Information'));assert.equal(sections.length,2);assert.match(JSON.stringify(sections[0]),/Old repair/);assert.match(JSON.stringify(sections[1]),/New repair/);assert.doesNotMatch(JSON.stringify(sections),/Budget/);
   await reset();
 });

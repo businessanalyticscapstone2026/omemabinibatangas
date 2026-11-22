@@ -443,3 +443,15 @@ test('a pending annual inspection starts with empty result fields even if a plac
   assert.doesNotMatch(container.querySelector('.module-form-panel').textContent,/old.jpg/);
   act(()=>root.unmount());container.remove();
 });
+
+test('inspection details and print omit the submitted attachment section without hiding assessment files', async () => {
+  const inspection={...pendingInspection,isScheduledAnnualFollowUp:false,conditionRating:5,conditionRatings:{Concrete:'Fair'},conditionRemarks:{Concrete:'Crack'},conditionAttachments:{Concrete:[{name:'assessment.jpg',type:'image/jpeg',dataUrl:'data:image/jpeg;base64,AA=='}]},attachment:{name:'submitted.jpg',type:'image/jpeg',dataUrl:'data:image/jpeg;base64,AA=='}};
+  const {container,root}=renderModule([inspection],'Head Engineer');
+  await act(async()=>container.querySelector('[aria-label^="View full inspection"]').click());
+  const dialog=container.querySelector('.inspection-detail-dialog');
+  assert.doesNotMatch(dialog.textContent,/Submitted Attachments|submitted.jpg/);
+  assert.match(dialog.textContent,/assessment.jpg/);
+  await act(async()=>[...dialog.querySelectorAll('button')].find(b=>b.textContent.includes('Print')).click());
+  assert.equal(printedDocuments.at(-1).attachment,undefined);
+  act(()=>root.unmount());container.remove();
+});

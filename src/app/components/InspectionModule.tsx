@@ -253,7 +253,6 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
   const [printSections, setPrintSections] = useState<PrintSection[] | null>(null);
   // @mine — task 14: "All years" or one year for the overview print.
   const [overviewPrintYear, setOverviewPrintYear] = useState('all');
-  const [printAttachment, setPrintAttachment] = useState<Inspection['attachment']>();
   const [selectedInspectionAttachment, setSelectedInspectionAttachment] = useState<Inspection['attachment'] | null>(null);
   const canPrint = ['Admin', 'Head Engineer', 'Staff - Inspector'].includes(userRole);
   const [conditionRatings, setConditionRatings] = useState<Record<string, string>>({});
@@ -594,7 +593,6 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
       'Print Requested',
       `Requested print for inspection ${referenceId} (${projectName})`,
     ).catch((error: unknown) => console.error('Failed to record inspection print activity.', error));
-    setPrintAttachment(inspection.attachment);
     setPrintSections([
       {
         title: 'Project Information',
@@ -658,7 +656,6 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
         };
       });
     if (!sections.length) { window.alert('There is nothing to print for this selection yet.'); return; }
-    setPrintAttachment(undefined);
     setPrintSections(sections);
   };
 
@@ -668,10 +665,8 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
       <PrintDocument
         title="Local Road Project Inspection Results"
         sections={printSections}
-        attachment={printAttachment}
         onComplete={() => {
           setPrintSections(null);
-          setPrintAttachment(undefined);
         }}
       />
     )}
@@ -1271,30 +1266,6 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                     ) : (
                       <p className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-sm text-gray-500">
                         {details.length > 0 ? 'No defects identified.' : 'No condition details recorded.'}
-                      </p>
-                    )}
-                  </section>
-                  <section className="border-t pt-5">
-                    <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-600">Submitted Attachments</h3>
-                    {inspection.attachment ? (
-                      <div className="overflow-hidden rounded-lg border border-gray-300 bg-gray-100">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedInspectionAttachment(inspection.attachment ?? null)}
-                          className="flex w-full flex-col items-center justify-center bg-slate-100 p-3 text-sm text-blue-700 hover:bg-blue-50"
-                        >
-                          {inspection.attachment.type.startsWith('image/') ? (
-                            <img src={inspection.attachment.dataUrl} alt="" className="h-28 w-full object-contain" />
-                          ) : (
-                            <FileText className="mb-2 h-10 w-10" aria-hidden="true" />
-                          )}
-                          <span className="mt-2 font-medium hover:underline">{inspection.attachment.name}</span>
-                          <span className="mt-1 text-xs text-slate-500">Select to view full attachment</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <p className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-sm text-gray-500">
-                        No attachments available.
                       </p>
                     )}
                   </section>

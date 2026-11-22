@@ -393,14 +393,17 @@ test('maintenance cards show the linked inspection date in both positions until 
 
 test('inspector project GET never includes another inspector project, including archived rows', async () => {
   role = 'inspector';
-  const rows = [{ id: 'mine', inspectorId: 'test' }, { id: 'other', inspectorId: 'other' }, { id: 'none' }];
+  const rows = [{ id: 'mine', inspectorId: 'test' }, { id: 'other', inspectorId: 'other' }, { id: 'none' }, { id: 'former', inspectorId: 'other', location:'Mabini', roadNetworkId:'R-1', roadName:'Old Road' }, { id: 'archived-history', inspectorId:'other' }];
   const route = loadTs('src/app/api/local-road/route.ts', {
     ...mocks,
-    '@/lib/supabase-data': { ...data, listRoads: async () => rows, listArchivedRoads: async () => rows },
+    '@/lib/supabase-data': { ...data, listRoads: async () => rows, listArchivedRoads: async () => rows,
+      listInspections: async () => [{localRoadId:'former',inspectorId:'test'},{localRoadId:'other',inspectorId:'other'}],
+      listArchivedInspections: async () => [{localRoadId:'archived-history',inspectorId:'test'}] },
   });
   const result = await route.GET({});
-  assert.deepEqual(result.body.data.map(row => row.id), ['mine']);
-  assert.deepEqual(result.body.archived.map(row => row.id), ['mine']);
+  assert.deepEqual(result.body.data.map(row => row.id), ['mine','former','archived-history']);
+  assert.equal(result.body.data[1].location,'Mabini'); assert.equal(result.body.data[1].roadNetworkId,'R-1');
+  assert.deepEqual(result.body.archived.map(row => row.id), ['mine','former','archived-history']);
   role = null;
 });
 

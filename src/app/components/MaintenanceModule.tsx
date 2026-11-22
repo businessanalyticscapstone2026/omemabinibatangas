@@ -182,7 +182,6 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
           { label: 'Type of Maintenance', value: item.type, width: 'third' as const },
           { label: 'Status', value: item.status, width: 'third' as const },
           { label: 'Scheduled Date', value: item.scheduledDate, width: 'third' as const },
-          { label: 'Budget', value: item.cost ? `Php ${Number(item.cost).toLocaleString()}` : '', width: 'third' as const },
           { label: 'Maintenance Activities', value: item.description, width: 'full' as const },
           { label: 'Remarks', value: item.remarks, width: 'full' as const },
         ],
@@ -702,10 +701,6 @@ export function MaintenanceModule({ maintenanceRecords, scheduledInspectionIds =
                     <div>
                       <p className="mb-2 text-sm font-medium text-gray-700">Scheduled Date</p>
                       <p className="min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-gray-700">{record.scheduledDate || ''}</p>
-                    </div>
-                    <div>
-                      <p className="mb-2 text-sm font-medium text-gray-700">Budget</p>
-                      <p className="min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-gray-700">{record.cost ? `Php ${Number(record.cost).toLocaleString()}` : ''}</p>
                     </div>
                     <div className="md:col-span-3">
                       <p className="mb-2 text-sm font-medium text-gray-700">Maintenance Activities</p>
