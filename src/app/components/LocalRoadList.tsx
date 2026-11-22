@@ -155,6 +155,8 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
   const [validationResult, setValidationResult] = useState<'Validated' | 'Return for Revision' | ''>('');
   const [validationRemarks, setValidationRemarks] = useState('');
   const [savingValidation, setSavingValidation] = useState(false);
+  const [confirmationStep, setConfirmationStep] = useState<0 | 1 | 2>(0);
+  const [validationSaveError, setValidationSaveError] = useState('');
   const savingValidationRef = useRef(false);
   const [selectedValidationYear, setSelectedValidationYear] = useState<number | null>(null);
   const [printSections, setPrintSections] = useState<PrintSection[] | null>(null);
@@ -288,12 +290,36 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
     'Talaga Proper',
     'Talaga East',
   ];
+  const submitConfirmedValidation = async () => {
+    if (confirmationStep !== 2 || !selectedItem || !validationResult || !validationRemarks.trim() || savingValidationRef.current) return;
+    savingValidationRef.current = true;
+    setSavingValidation(true);
+    setValidationSaveError('');
+    try {
+      const saved = await onSaveValidation?.(selectedItem.id, validationResult, validationRemarks, selectedValidationYear ?? undefined);
+      if (saved) {
+        setConfirmationStep(0);
+        setSelectedItem(null);
+      } else {
+        setValidationSaveError('Validation was not saved. Review the error and try again.');
+      }
+    } catch (error) {
+      console.error('Validation save failed.', error);
+      setValidationSaveError('Unable to save validation. Please try again.');
+    } finally {
+      savingValidationRef.current = false;
+      setSavingValidation(false);
+    }
+  };
+
   const selectedDetails = (
     <>
     <Dialog
       open={selectedItem !== null}
       onOpenChange={(open) => {
         if (!open && !savingValidationRef.current) {
+          setConfirmationStep(0);
+          setValidationSaveError('');
           setSelectedItem(null);
           setSelectedAttachment(null);
           setValidationResult('');
@@ -503,21 +529,11 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                 onSubmit={async (event) => {
                   event.preventDefault();
                   if (!validationResult || !validationRemarks.trim() || savingValidationRef.current) return;
-                  savingValidationRef.current = true;
-                  setSavingValidation(true);
-                  try {
-                    const saved = await onSaveValidation?.(selectedItem.id, validationResult, validationRemarks, selectedValidationYear ?? undefined);
-                    if (saved) setSelectedItem(null);
-                  } catch (error) {
-                    console.error('Validation save failed.', error);
-                    window.alert('Unable to save validation. Please try again.');
-                  } finally {
-                    savingValidationRef.current = false;
-                    setSavingValidation(false);
-                  }
+                  setValidationSaveError('');
+                  setConfirmationStep(1);
                 }}
               >
-                <fieldset disabled={savingValidation}>
+                <fieldset disabled={savingValidation || confirmationStep !== 0}>
                   <legend className="text-sm font-semibold text-gray-900">Validation Result<span className="text-red-600">*</span></legend>
                   <div className="mt-2 flex w-fit max-w-full flex-nowrap gap-6 overflow-x-auto">
                     {(['Validated', 'Return for Revision'] as const).map(result => (
@@ -530,7 +546,7 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                 </fieldset>
                 <div>
                   <label htmlFor="validation-remarks" className="block text-sm font-semibold text-gray-900">Remarks<span className="text-red-600">*</span></label>
-                  <AutoGrowTextarea disabled={savingValidation} id="validation-remarks" value={validationRemarks} onChange={event => setValidationRemarks(event.target.value)} required className="mt-2 w-full resize-y rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-[#0ea5e9] focus:outline-none focus:ring-2 focus:ring-[#0ea5e9]" />
+                  <AutoGrowTextarea disabled={savingValidation || confirmationStep !== 0} id="validation-remarks" value={validationRemarks} onChange={event => setValidationRemarks(event.target.value)} required className="mt-2 w-full resize-y rounded-md border border-gray-300 px-3 py-2 text-gray-900 focus:border-[#0ea5e9] focus:outline-none focus:ring-2 focus:ring-[#0ea5e9]" />
                 </div>
                 <div className="text-sm text-gray-800">
                   <p>Validated by:</p>
@@ -539,13 +555,46 @@ export function LocalRoadList({ data, onAdd, onEdit, onDelete, validationMode = 
                 </div>
                 <div className="flex justify-end gap-3">
                   <button type="button" disabled={savingValidation} onClick={() => setSelectedItem(null)} className="rounded-md border border-gray-300 px-5 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">Cancel</button>
-                  <button type="submit" disabled={savingValidation} className="rounded-md bg-[#0ea5e9] px-5 py-2 text-sm font-medium text-white hover:bg-[#0284c7] disabled:opacity-50">
+                  <button type="submit" disabled={savingValidation || confirmationStep !== 0} className="rounded-md bg-[#0ea5e9] px-5 py-2 text-sm font-medium text-white hover:bg-[#0284c7] disabled:opacity-50">
                     <span aria-live="polite">{savingValidation ? (validationResult === 'Return for Revision' ? 'Saving...' : 'Submitting...') : (validationResult === 'Return for Revision' ? 'Save' : 'Submit')}</span>
                   </button>
                 </div>
               </form>
             )}
             </div>
+          </div>
+        </DialogContent>
+      )}
+    </Dialog>
+    <Dialog open={confirmationStep !== 0} onOpenChange={(open) => {
+      if (!open && !savingValidationRef.current) { setConfirmationStep(0); setValidationSaveError(''); }
+    }}>
+      {confirmationStep !== 0 && selectedItem && (
+        <DialogContent className="rounded-2xl bg-white text-slate-800 sm:max-w-lg"
+          onEscapeKeyDown={event => { if (savingValidationRef.current) event.preventDefault(); }}
+          onPointerDownOutside={event => { if (savingValidationRef.current) event.preventDefault(); }}>
+          <DialogTitle>
+            {confirmationStep === 2 ? 'Are you sure?' : validationResult === 'Validated' ? 'Confirm validation?' : 'Return this project for revision?'}
+          </DialogTitle>
+          <DialogDescription className="text-slate-600">
+            {confirmationStep === 2
+              ? `You are about to submit ${validationResult} for ${selectedItem.projectName || selectedItem.name} — ${selectedValidationYear}.`
+              : validationResult === 'Validated'
+                ? `Mark “${selectedItem.projectName || selectedItem.name}” as Validated for ${selectedValidationYear}?`
+                : `Return “${selectedItem.projectName || selectedItem.name}” to the Encoder for ${selectedValidationYear}?`}
+          </DialogDescription>
+          {validationResult === 'Return for Revision' && (
+            <div className="rounded-lg bg-slate-50 p-3"><p className="text-sm font-semibold">Revision remarks</p>
+              <p className="whitespace-pre-wrap break-words text-sm">{validationRemarks}</p></div>
+          )}
+          {validationSaveError && <p role="alert" className="text-sm text-red-700">{validationSaveError}</p>}
+          <div className="flex justify-end gap-3">
+            <button type="button" disabled={savingValidation} className="rounded-md border px-4 py-2 disabled:opacity-50"
+              onClick={() => { setConfirmationStep(confirmationStep === 2 ? 1 : 0); setValidationSaveError(''); }}>Go Back</button>
+            <button type="button" disabled={savingValidation} className="rounded-md bg-blue-700 px-4 py-2 text-white disabled:opacity-50"
+              onClick={() => { if (confirmationStep === 1) setConfirmationStep(2); else void submitConfirmedValidation(); }}>
+              <span aria-live="polite">{savingValidation ? 'Submitting...' : confirmationStep === 2 ? 'Yes, Submit' : validationResult === 'Validated' ? 'Confirm Validation' : 'Confirm Return'}</span>
+            </button>
           </div>
         </DialogContent>
       )}
