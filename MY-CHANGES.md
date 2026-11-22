@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Show annual inspections immediately after validation
+- **Type:** Modified
+- **Files:** `src/lib/supabase-data.ts` (modified), `tests/validation-workflow.test.cjs` (modified)
+- **What & why:** A follow-up validated on the first day of its window should appear without waiting for the inspection window; the minimum inspection date is unchanged.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Show eligible annual follow-ups in inspection and maintenance
 - **Type:** Modified
 - **Files:** `src/app/App.tsx` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/components/MaintenanceModule.tsx` (modified), `tests/inspection-selection.test.cjs` (modified), `tests/project-form.test.cjs` (modified)

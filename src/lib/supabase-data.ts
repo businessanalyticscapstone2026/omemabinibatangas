@@ -302,12 +302,13 @@ export async function ensureAnnualFollowUps(db: SupabaseClient, admin?: Supabase
     if (!dueYears.length) continue;
 
     const [{ data: entries, error: entriesError }, { data: followUps }] = await Promise.all([
-      db.from('annual_validation_entries').select('year').eq('project_id', project.id),
+      db.from('annual_validation_entries').select('year, result, deleted_at').eq('project_id', project.id),
       db.from('inspections').select('annual_follow_up_year').eq('project_id', project.id).eq('inspection_type', 'follow_up').not('annual_follow_up_year', 'is', null),
     ]);
     if (entriesError) throw entriesError;
     const haveEntries = new Set((entries ?? []).map((e: Joined) => e.year));
     const haveFollowUps = new Set((followUps ?? []).map((e: Joined) => e.annual_follow_up_year));
+    const approvedYears = new Set((entries ?? []).filter((e: Joined) => e.result === 'approved' && !e.deleted_at).map((e: Joined) => e.year));
 
     for (const { year, validationDue, inspectionDue } of dueYears) {
       if (!haveEntries.has(year)) {
@@ -315,8 +316,9 @@ export async function ensureAnnualFollowUps(db: SupabaseClient, admin?: Supabase
           .upsert({ project_id: project.id, year, due_date: validationDue, result: 'pending' }, { onConflict: 'project_id,year', ignoreDuplicates: true });
         if (insertError) throw insertError;
       }
-      // The inspection itself only appears once its own date is reached.
-      if (!haveFollowUps.has(year) && inspectionDue <= today) {
+      // A validated year must appear immediately, even on the first validation-window day.
+      // Its inspection date still cannot precede the normal inspection window.
+      if (!haveFollowUps.has(year) && (inspectionDue <= today || approvedYears.has(year))) {
         await writer.from('inspections')
           .insert({
             project_id: project.id,

@@ -342,3 +342,11 @@ test('annual generator makes all due years and does not recreate a removed year'
   assert.deepEqual(writes.filter(w=>w.table==='annual_validation_entries').map(w=>w.value.year),[2024,2026]);
   assert.deepEqual(writes.filter(w=>w.table==='inspections').map(w=>w.value.annual_follow_up_year),[2024,2025,2026]);
 });
+
+test('an approved follow-up appears as soon as validated on the first window day', async () => {
+  const dm=load('src/lib/supabase-data.ts',{'@/lib/attachment-validation':load('src/lib/attachment-validation.ts'),'@/lib/project-form-validation':load('src/lib/project-form-validation.ts'),'@/lib/supabase':{ROLE_FROM_DB:{},ROLE_TO_DB:{}}});
+  const RealDate=global.Date; class MockDate extends RealDate {constructor(...args){super(...(args.length?args:['2027-10-12T12:00:00Z']));} static now(){return new RealDate('2027-10-12T12:00:00Z').getTime();}}
+  const writes=[];const db={from(table){const chain={select(){return chain;},is(){return chain;},not(){return chain;},eq(){return chain;},upsert(value){writes.push({table,value});return Promise.resolve({error:null});},insert(value){writes.push({table,value});return Promise.resolve({error:null});},then(resolve,reject){const data=table==='projects'?[{id:'p',actual_completion_date:'2026-11-11'}]:table==='annual_validation_entries'?[{year:2027,result:'approved',deleted_at:null}]:[];return Promise.resolve({data,error:null}).then(resolve,reject);}};return chain;}};
+  try {global.Date=MockDate;await dm.ensureAnnualFollowUps(db);} finally {global.Date=RealDate;}
+  const inspection=writes.find(w=>w.table==='inspections');assert.equal(inspection.value.annual_follow_up_year,2027);assert.equal(inspection.value.inspection_date,'2027-10-13');
+});
