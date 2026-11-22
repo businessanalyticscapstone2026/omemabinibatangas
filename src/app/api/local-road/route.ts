@@ -244,6 +244,11 @@ export async function PATCH(request: Request) {
     return withRefresh(NextResponse.json({ success: true, data: saved }), auth);
   } catch (error) {
     console.error('Failed to update project.', error);
+    const message = error && typeof error === 'object' && 'message' in error ? String(error.message) : '';
+    if (message === 'Record the first-anniversary inspection result before validating a later follow-up.' ||
+        message === 'Complete maintenance for the first-anniversary inspection before validating a later follow-up.') {
+      return NextResponse.json({ message }, { status: 409 });
+    }
     const failure = saveFailure(error, 'Unable to update this project. Your role may not permit it.');
     return NextResponse.json({ message: failure.message }, { status: failure.status });
   }

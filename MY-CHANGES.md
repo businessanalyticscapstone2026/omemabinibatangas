@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-22 — [mine] Require first follow-up results before later validation
+- **Type:** Modified
+- **Files:** `src/app/api/local-road/route.ts` (modified), `tests/validation-workflow.test.cjs` (modified), `supabase/migrations/20261124_first_followup_validation_gate.sql` (new), `tests/first-followup-validation-gate.test.cjs` (new)
+- **What & why:** Block later approval until first-year inspection and any required maintenance are recorded.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Queue inspector reassignment for validated later follow-ups
 - **Type:** Modified
 - **Files:** `package-lock.json` (modified), `package.json` (modified), `src/app/App.tsx` (modified), `src/app/api/inspections/route.ts` (modified), `src/app/api/local-road/route.ts` (modified), `src/lib/supabase-data.ts` (modified), `tests/inspection-purpose.test.cjs` (modified), `tests/validation-workflow.test.cjs` (modified), `supabase/migrations/20261123_annual_inspector_queue.sql` (new), `tests/annual-inspector-queue.test.cjs` (new)

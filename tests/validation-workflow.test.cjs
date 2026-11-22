@@ -343,3 +343,23 @@ test('an approved follow-up appears as soon as validated on the first window day
   try {global.Date=MockDate;await dm.ensureAnnualFollowUps(db);} finally {global.Date=RealDate;}
   const inspection=writes.find(w=>w.table==='inspections');assert.equal(inspection.value.annual_follow_up_year,2027);assert.equal(inspection.value.inspection_date,'2027-10-13');
 });
+
+test('validator receives the first follow-up prerequisite error and no validation email is sent', async () => {
+  let message='Record the first-anniversary inspection result before validating a later follow-up.', notifications=0;
+  const project={id:'p',name:'Road',actualCompletionDate:'2000-01-01',annualValidationEntries:[entry(2001,'Validated','OK'),entry(2002)]};
+  const res=(status,body={})=>({status,body});
+  const route=load('src/app/api/local-road/route.ts',{
+    'next/server':{NextResponse:{json:(body,init)=>res(init?.status||200,body)}},
+    '@/lib/project-validation-workflow':workflow,
+    '@/lib/project-form-validation':load('src/lib/project-form-validation.ts'),
+    '@/lib/notifications':{notifyWorkflow:async()=>{notifications++;},actionNote:()=>''},
+    '@/lib/api':{requireAuth:async()=>({profile:{roleDb:'validator',username:'Tester'},db:'user',admin:'admin',userId:'u'}),forbidden:()=>res(403),unauthorized:()=>res(401),withRefresh:r=>r},
+    '@/lib/supabase-data':{listRoads:async()=>[project],saveAnnualValidation:async()=>{throw {message,code:'P0001'};},addActivityLog:async()=>{}},
+  });
+  const payload={id:'p',annualValidationYear:2002,validationResult:'Validated',validationRemarks:'OK'};
+  for (message of ['Record the first-anniversary inspection result before validating a later follow-up.','Complete maintenance for the first-anniversary inspection before validating a later follow-up.']) {
+    const response=await route.PATCH({json:async()=>payload});
+    assert.equal(response.status,409);assert.equal(response.body.message,message);
+  }
+  assert.equal(notifications,0);
+});
