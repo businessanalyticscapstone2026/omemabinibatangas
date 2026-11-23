@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   if (typeof payload.dateStarted === 'string' && payload.dateStarted && typeof payload.scheduledDate === 'string' && payload.scheduledDate && payload.scheduledDate < payload.dateStarted) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
   if (typeof payload.inspectionId !== 'string' || !payload.inspectionId) return NextResponse.json({ message: 'Select a project with an eligible inspection.' }, { status: 400 });
   try {
-    const [inspections, active, archived, archivedInspections] = await Promise.all([listInspections(auth.db), listMaintenance(auth.db), listArchivedMaintenance(auth.db), listArchivedInspections(auth.db)]);
+    const [inspections, active, archived, archivedInspections] = await Promise.all([listInspections(auth.db, auth.admin), listMaintenance(auth.db), listArchivedMaintenance(auth.db), listArchivedInspections(auth.db)]);
     const scheduledIds = [...active, ...archived].map(item => item.inspectionId).filter((id): id is string => typeof id === 'string');
     const eligible = eligibleMaintenanceInspections(inspections as any[], scheduledIds, archivedInspections as any[]).find(item => item.localRoadId === payload.localRoadId && item.id === payload.inspectionId);
     if (!eligible || eligible.id !== payload.inspectionId) {
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     if (!minimum) return NextResponse.json({ message: 'The linked inspection date could not be verified.' }, { status: 409 });
     if ([payload.dateStarted, payload.scheduledDate].some(date => typeof date === 'string' && date && date < minimum)) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
   } catch (error) { console.error('Failed to check inspection eligibility.', error); return NextResponse.json({ message: 'Unable to check inspection eligibility.' }, { status: 500 }); }
-  const road = (await listRoads(auth.db)).find((item) => item.id === payload.localRoadId);
+  const road = (await listRoads(auth.db, auth.admin)).find((item) => item.id === payload.localRoadId);
   if (!road) return NextResponse.json({ message: 'Road not found.' }, { status: 404 });
   try {
     const record = await saveMaintenance(auth.db, { ...payload, id: '', status: 'Scheduled', completedDate: '' }, road.id, auth.userId);
@@ -83,7 +83,7 @@ export async function PATCH(request: Request) {
       if (payload.completedDate != null && payload.completedDate !== '' && (typeof payload.completedDate !== 'string' || !hasFourDigitYear(payload.completedDate))) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
       if (payload.status === 'Completed' && (typeof payload.completedDate !== 'string' || !hasFourDigitYear(payload.completedDate))) return NextResponse.json({ message: 'A valid completion date is required.' }, { status: 409 });
       if (payload.completedDate && record.inspectionId) {
-        const [activeInspections, archivedInspections] = await Promise.all([listInspections(auth.db), listArchivedInspections(auth.db)]);
+        const [activeInspections, archivedInspections] = await Promise.all([listInspections(auth.db, auth.admin), listArchivedInspections(auth.db)]);
         const linked = [...activeInspections, ...archivedInspections].find(item => item.id === record.inspectionId && item.localRoadId === record.localRoadId);
         const minimum = linked && addCalendarDays(String(linked.date || ''), 1);
         if (!minimum) return NextResponse.json({ message: 'The linked inspection date could not be verified.' }, { status: 409 });
@@ -111,14 +111,14 @@ export async function PATCH(request: Request) {
     if (payload.scheduledDate < payload.dateStarted || (record.completedDate && (!hasFourDigitYear(String(record.completedDate)) || String(record.completedDate) < payload.dateStarted))) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
     if (!payload.type.trim() || !payload.description.trim()) return NextResponse.json({ message: 'Please fill out this field.' }, { status: 400 });
     if (record.inspectionId) {
-      const [activeInspections, archivedInspections] = await Promise.all([listInspections(auth.db), listArchivedInspections(auth.db)]);
+      const [activeInspections, archivedInspections] = await Promise.all([listInspections(auth.db, auth.admin), listArchivedInspections(auth.db)]);
       const linked = [...activeInspections, ...archivedInspections].find(item => item.id === record.inspectionId && item.localRoadId === record.localRoadId);
       const minimum = linked && addCalendarDays(String(linked.date || ''), 1);
       if (!minimum) return NextResponse.json({ message: 'The linked inspection date could not be verified.' }, { status: 409 });
       if (payload.dateStarted < minimum || payload.scheduledDate < minimum) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
     }
     if (payload.localRoadId !== record.localRoadId) return NextResponse.json({ message: 'The project of an existing maintenance record cannot be changed.' }, { status: 400 });
-    const road = (await listRoads(auth.db)).find((item) => item.id === payload.localRoadId);
+    const road = (await listRoads(auth.db, auth.admin)).find((item) => item.id === payload.localRoadId);
     if (!road) return NextResponse.json({ message: 'Road not found.' }, { status: 404 });
     const updated = await saveMaintenance(auth.db, {
       ...record,

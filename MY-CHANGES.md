@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-23 — [mine] Notify staff when annual validations and inspections are recorded
+- **Type:** Modified
+- **Files:** `src/app/api/inspections/route.ts` (modified), `src/app/api/maintenance/route.ts` (modified), `src/lib/supabase-data.ts` (modified), `tests/automatic-validation-email.test.cjs` (new)
+- **What & why:** Send the validator a For Validation email as the annual entry is generated and preserve the encoder notification when the assigned inspector records a result.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-23 — [mine] Preserve inspectors on annual inspection results
 - **Type:** Modified
 - **Files:** `src/app/api/inspections/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/workflow-emails.test.cjs` (modified), `supabase/migrations/20261125_finish_annual_inspection_summary.sql` (new), `tests/annual-inspection-summary.test.cjs` (new)

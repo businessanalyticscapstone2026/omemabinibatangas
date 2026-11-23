@@ -38,7 +38,7 @@ async function refreshRoadCondition(auth: Awaited<ReturnType<typeof requireAuth>
   if (!auth) return null;
   const road = (await listRoads(auth.db, auth.admin)).find((item) => item.id === roadId);
   if (!road) return null;
-  const latest = (await listInspections(auth.db))
+  const latest = (await listInspections(auth.db, auth.admin))
     .filter((i) => i.localRoadId === roadId)
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
   const rating = latest ? Number(latest.conditionRating) : 0;
@@ -105,7 +105,7 @@ async function notifyInspectionRecorded(auth: NonNullable<Awaited<ReturnType<typ
     : notification.sent < notification.recipients.length
       ? 'Inspection saved, but email delivery failed for some recipients. Please contact the Head Engineer.' : undefined;
   await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username,
-    action: 'Inspection Email Delivery', details: `Inspection ${inspection.id}: sent ${notification.sent} of ${notification.recipients.length}; ${notification.skipped || (notificationWarning ? 'delivery incomplete' : 'delivered')}.` });
+    action: 'Inspection Email Delivery', details: `Inspection ${inspection.id}: accepted by mail server ${notification.sent} of ${notification.recipients.length}; ${notification.skipped || (notificationWarning ? 'delivery incomplete' : 'inbox delivery not verified')}.` });
   return notificationWarning;
 }
 
@@ -176,7 +176,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ message: 'Select an inspection type and complete every assessment, including remarks and attachments for Fair, Poor, and Bad components.' }, { status: 400 });
   }
   payload.remarks = findingsSummary(ratings, remarks);
-  const inspections = await listInspections(auth.db);
+  const inspections = await listInspections(auth.db, auth.admin);
   const existing = inspections.find((item) => item.id === payload.id);
   if (!existing) return NextResponse.json({ message: 'Inspection not found.' }, { status: 404 });
   const road = (await listRoads(auth.db, auth.admin)).find((item) => item.id === payload.localRoadId);
@@ -237,7 +237,7 @@ export async function DELETE(request: Request) {
   const id = url.searchParams.get('id');
   if (!id) return NextResponse.json({ message: 'An inspection ID is required.' }, { status: 400 });
   const permanent = url.searchParams.get('permanent') === 'true';
-  const inspection = (await listInspections(auth.db)).find((item) => item.id === id);
+  const inspection = (await listInspections(auth.db, auth.admin)).find((item) => item.id === id);
   if (!inspection) return NextResponse.json({ message: 'Inspection not found.' }, { status: 404 });
   try {
     const changed = permanent ? await permanentlyDeleteInspection(auth.db, id) : await archiveInspection(auth.db, id);
