@@ -281,7 +281,7 @@ export async function ensureAnnualFollowUps(db: SupabaseClient, admin?: Supabase
   const currentYear = Number(today.slice(0, 4));
   const { data: projects, error } = await db
     .from('projects')
-    .select('id, actual_completion_date, completion_date')
+    .select('id, project_name, actual_completion_date, completion_date')
     .is('archived_at', null)
     .not('actual_completion_date', 'is', null);
   if (error) throw error;
@@ -312,9 +312,31 @@ export async function ensureAnnualFollowUps(db: SupabaseClient, admin?: Supabase
 
     for (const { year, validationDue, inspectionDue } of dueYears) {
       if (!haveEntries.has(year)) {
-        const { error: insertError } = await writer.from('annual_validation_entries')
+        const insert = writer.from('annual_validation_entries')
           .upsert({ project_id: project.id, year, due_date: validationDue, result: 'pending' }, { onConflict: 'project_id,year', ignoreDuplicates: true });
+        // Only the request that actually inserted this year should notify. A
+        // concurrent upsert that found an existing row returns no rows.
+        const { data: inserted, error: insertError } = admin ? await insert.select('year') : await insert;
         if (insertError) throw insertError;
+        if (admin && inserted?.length) {
+          try {
+            const { notifyWorkflow } = await import('@/lib/notifications');
+            const name = str(project.project_name);
+            const result = await notifyWorkflow(admin, {
+              kind: 'for-validation', projectName: name,
+            });
+            // Preserve the existing cron's project/year marker only after all
+            // intended recipients were accepted by the mail server.
+            if (result.sent > 0 && result.sent === result.recipients.length) {
+              await recordValidationReminder(admin, `${project.id} ${year} — ${name}`);
+            } else {
+              console.error(`Validation notification for ${project.id}/${year} was not fully sent.`, result.skipped || 'delivery failed');
+            }
+          } catch (error) {
+            // The entry is already saved; cron can retry an unmarked reminder.
+            console.error('Annual validation was created, but its email failed.', error);
+          }
+        }
       }
       // A validated year must appear immediately, even on the first validation-window day.
       // Its inspection date still cannot precede the normal inspection window.

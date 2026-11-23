@@ -216,3 +216,18 @@ test('email 6 — first results on a scheduled row notify; later edits and spoof
   assert.equal((await submit()).status, 200);
   assert.equal(emails.length, 0);
 });
+
+test('a logging or notification failure after recording does not report the inspection as unsaved', async () => {
+  const pending={id:'scheduled',localRoadId:'p',date:'2026-01-01',annualFollowUpYear:2026,isScheduledAnnualFollowUp:true};
+  const state={roleDb:'inspector',userId:'u',data:{
+    listRoads:async()=>[{id:'p',projectName:'Road',inspectorId:'u',actualCompletionDate:'2025-01-01'}],
+    listInspections:async()=>[pending], saveInspection:async()=>({...pending,isScheduledAnnualFollowUp:false,inspector:'Inspector'}),
+    saveRoad:async(_db,road)=>road,addActivityLog:async()=>{throw Error('logging offline');},
+  }};
+  const mocks=baseMocks(state);
+  mocks['@/lib/inspection-selection']={validateAssessment:()=>true,findingsSummary:()=>''};
+  mocks['@/lib/notifications']={actionNote:()=>'',notifyWorkflow:async()=>{throw Error('email offline');}};
+  const route=load('src/app/api/inspections/route.ts',mocks);
+  const response=await route.PUT(request({id:'scheduled',localRoadId:'p',date:'2026-01-01',inspectionType:'Monitoring and Maintenance Inspection',conditionRating:9,conditionRatings:{},conditionRemarks:{},conditionAttachments:{}}));
+  assert.equal(response.status,200); assert.equal(response.body.success,true); assert.match(response.body.notificationWarning,/Inspection saved/);
+});

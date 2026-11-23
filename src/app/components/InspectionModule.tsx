@@ -870,6 +870,10 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
                 <div className="border-b pb-4">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Inspector Information</h3>
                   <div className="rounded-lg border border-gray-300 overflow-hidden bg-white">
+                    <div className="border-b border-gray-300">
+                      <label htmlFor="inspection-inspector" className="block px-4 pt-3 text-[1.05rem] font-bold text-gray-900">Inspector</label>
+                      <div className="p-3 bg-[#f3f4f6]"><input id="inspection-inspector" value={editingInspection?.inspector || currentUser} readOnly className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-900 text-base" /></div>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
                       <div className="border-r border-gray-300">
                         <label className="block px-4 pt-3 text-[1.05rem] font-bold text-gray-900">Inspection Date*</label>

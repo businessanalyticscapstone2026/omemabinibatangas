@@ -38,7 +38,7 @@ async function refreshRoadCondition(auth: Awaited<ReturnType<typeof requireAuth>
   if (!auth) return null;
   const road = (await listRoads(auth.db, auth.admin)).find((item) => item.id === roadId);
   if (!road) return null;
-  const latest = (await listInspections(auth.db))
+  const latest = (await listInspections(auth.db, auth.admin))
     .filter((i) => i.localRoadId === roadId)
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
   const rating = latest ? Number(latest.conditionRating) : 0;
@@ -105,7 +105,7 @@ async function notifyInspectionRecorded(auth: NonNullable<Awaited<ReturnType<typ
     : notification.sent < notification.recipients.length
       ? 'Inspection saved, but email delivery failed for some recipients. Please contact the Head Engineer.' : undefined;
   await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username,
-    action: 'Inspection Email Delivery', details: `Inspection ${inspection.id}: sent ${notification.sent} of ${notification.recipients.length}; ${notification.skipped || (notificationWarning ? 'delivery incomplete' : 'delivered')}.` });
+    action: 'Inspection Email Delivery', details: `Inspection ${inspection.id}: accepted by mail server ${notification.sent} of ${notification.recipients.length}; ${notification.skipped || (notificationWarning ? 'delivery incomplete' : 'inbox delivery not verified')}.` });
   return notificationWarning;
 }
 
@@ -138,13 +138,19 @@ export async function POST(request: Request) {
   if (payload.date < minimum) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
   try {
     const inspection = await saveInspection(auth.db, { ...payload, id: '' }, road.id, auth.userId);
-    await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Inspection Created', details: `Created inspection ${inspection.id}` });
+    try { await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Inspection Created', details: `Created inspection ${inspection.id}` }); }
+    catch (error) { console.error('Inspection saved; activity logging failed.', error); }
     // The database trigger synchronizes condition. A secondary read must not prevent
     // notification after the inspection has already been committed.
     try { await refreshRoadCondition(auth, road.id); }
     catch (error) { console.error('Inspection saved; condition refresh failed.', error); }
     // Email 6 — the Head Engineer schedules the repair next, the encoder is told it is done.
-    const notificationWarning = await notifyInspectionRecorded(auth, road, inspection);
+    let notificationWarning: string | undefined;
+    try { notificationWarning = await notifyInspectionRecorded(auth, road, inspection); }
+    catch (error) {
+      console.error('Inspection saved; notification failed.', error);
+      notificationWarning = 'Inspection saved, but its email could not be confirmed. Please contact the Head Engineer; do not resubmit.';
+    }
     return withRefresh(NextResponse.json({ success: true, data: inspection, notificationWarning }), auth);
   } catch (error) {
     console.error('Failed to create inspection.', error);
@@ -170,7 +176,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ message: 'Select an inspection type and complete every assessment, including remarks and attachments for Fair, Poor, and Bad components.' }, { status: 400 });
   }
   payload.remarks = findingsSummary(ratings, remarks);
-  const inspections = await listInspections(auth.db);
+  const inspections = await listInspections(auth.db, auth.admin);
   const existing = inspections.find((item) => item.id === payload.id);
   if (!existing) return NextResponse.json({ message: 'Inspection not found.' }, { status: 404 });
   const road = (await listRoads(auth.db, auth.admin)).find((item) => item.id === payload.localRoadId);
@@ -200,11 +206,19 @@ export async function PUT(request: Request) {
       }
     }
     const inspection = await saveInspection(auth.admin, { ...existing, ...payload, id: existing.id, annualFollowUpYear: existing.annualFollowUpYear, validationStatus: existing.validationStatus }, road.id, auth.userId, existing.isScheduledAnnualFollowUp === true);
-    await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Inspection Updated', details: `Updated inspection ${inspection.id}` });
-    // This flag is read from the stored row, never trusted from the request.
-    // Scheduled placeholders exist before any results have been recorded.
-    const notificationWarning = existing.isScheduledAnnualFollowUp === true
-      ? await notifyInspectionRecorded(auth, road, inspection) : undefined;
+    // Logging and email are secondary to the committed inspection. A failure
+    // here must not tell the inspector that the already-saved result failed.
+    let notificationWarning: string | undefined;
+    try {
+      await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Inspection Updated', details: `Updated inspection ${inspection.id}` });
+    } catch (error) { console.error('Inspection saved; activity logging failed.', error); }
+    if (existing.isScheduledAnnualFollowUp === true) {
+      try { notificationWarning = await notifyInspectionRecorded(auth, road, inspection); }
+      catch (error) {
+        console.error('Inspection saved; notification failed.', error);
+        notificationWarning = 'Inspection saved, but its email could not be confirmed. Please contact the Head Engineer; do not resubmit.';
+      }
+    }
     let roadUpdate = null;
     try { roadUpdate = await refreshRoadCondition(auth, road.id); }
     catch (error) { console.error('Inspection saved; condition refresh failed.', error); }
@@ -223,7 +237,7 @@ export async function DELETE(request: Request) {
   const id = url.searchParams.get('id');
   if (!id) return NextResponse.json({ message: 'An inspection ID is required.' }, { status: 400 });
   const permanent = url.searchParams.get('permanent') === 'true';
-  const inspection = (await listInspections(auth.db)).find((item) => item.id === id);
+  const inspection = (await listInspections(auth.db, auth.admin)).find((item) => item.id === id);
   if (!inspection) return NextResponse.json({ message: 'Inspection not found.' }, { status: 404 });
   try {
     const changed = permanent ? await permanentlyDeleteInspection(auth.db, id) : await archiveInspection(auth.db, id);
