@@ -195,7 +195,7 @@ async function profileEmail(db: Db, id: string): Promise<string[]> {
 
 /** @mine — every active account with one of the roles, de-duplicated. */
 async function roleEmails(db: Db, roles: string[]): Promise<string[]> {
-  const { data, error } = await db.from('profiles').select('email, role, status').in('role', roles);
+  const { data, error } = await db.from('profiles').select('email, role, status, archived_at').in('role', roles);
   if (error) {
     console.error('Could not read the staff email addresses.', error);
     return [];
@@ -204,7 +204,7 @@ async function roleEmails(db: Db, roles: string[]): Promise<string[]> {
   // harness down-levels to ES5 and would silently empty.
   const recipients: string[] = [];
   for (const row of data ?? []) {
-    if (String(row?.status ?? 'active') === 'inactive') continue;
+    if (row?.archived_at || String(row?.status ?? 'active') !== 'active') continue;
     const email = String(row?.email ?? '').trim();
     if (email && recipients.indexOf(email) === -1) recipients.push(email);
   }
@@ -248,7 +248,12 @@ export async function notifyWorkflow(
     for (const to of recipients) {
       try {
         // One message per address, so no recipient sees another's address.
-        await sender({ from, to, subject, text, html });
+        const response = await sender({ from, to, subject, text, html });
+        // SMTP acceptance is not proof of inbox delivery, but an explicitly
+        // rejected envelope must never be recorded as successfully sent.
+        if (response && typeof response === 'object' && 'accepted' in response && Array.isArray(response.accepted) && response.accepted.length === 0) {
+          throw new Error('SMTP did not accept the recipient.');
+        }
         sent += 1;
       } catch (error) {
         console.error(`Could not send the "${subject}" email.`, error);

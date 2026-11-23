@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-23 — [mine] Retry workflow email notifications
+- **Type:** Modified
+- **Files:** `src/app/api/inspections/route.ts` (modified), `src/app/api/local-road/route.ts` (modified), `src/app/api/validation-reminders/route.ts` (modified), `src/lib/notifications.ts` (modified), `src/lib/validation-reminders.ts` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/notifications.test.cjs` (modified), `tests/role-crud.test.cjs` (modified), `tests/validation-reminders.test.cjs` (modified), `tests/workflow-emails.test.cjs` (modified), `src/lib/inspection-notification-queue.ts` (new), `src/lib/send-validation-reminders.ts` (new), `supabase/migrations/20261126_validation_reminder_claims.sql` (new), `supabase/migrations/20261127_inspection_notification_queue.sql` (new), `tests/inspection-notification-queue.test.cjs` (new), `tests/notification-queue-db.test.cjs` (new)
+- **What & why:** Notify validators when annual tasks appear and retry unsent inspection notifications without resubmission.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-23 — [mine] Preserve inspectors on annual inspection results
 - **Type:** Modified
 - **Files:** `src/app/api/inspections/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/workflow-emails.test.cjs` (modified), `supabase/migrations/20261125_finish_annual_inspection_summary.sql` (new), `tests/annual-inspection-summary.test.cjs` (new)

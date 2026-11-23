@@ -169,3 +169,9 @@ test('the documented password reset template uses the requested office name', ()
   assert.doesNotMatch(template, /Mabini MEO|MUNICIPAL ENGINEERING OFFICE|Local Road Management System|WBLRMS/i);
   assert.match(template, /{{ \.ConfirmationURL }}/);
 });
+
+test('a rejected SMTP envelope is not counted as sent and archived recipients are excluded', async () => {
+  notifications.__setNotificationSender(async () => ({accepted:[],rejected:['encoder@example.test']}));
+  const result=await notifications.notifyWorkflow(makeDb([{id:'e',email:'encoder@example.test',role:'encoder',status:'active'},{id:'retired',email:'retired@example.test',role:'encoder',status:'active',archived_at:'2026-01-01'}]), {kind:'inspection-recorded',projectName:'Road'});
+  assert.equal(result.sent,0); assert.deepEqual(result.recipients,['encoder@example.test']);
+});

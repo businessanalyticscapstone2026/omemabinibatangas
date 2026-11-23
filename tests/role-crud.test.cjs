@@ -38,7 +38,7 @@ const data = {
   archiveMaintenance: async () => (calls.push('maintenance'), true),
   addActivityLog: async () => {},
 };
-const mocks = { '@/lib/project-form-validation': loadTs('src/lib/project-form-validation.ts', {}), '@/lib/inspection-selection': loadTs('src/lib/inspection-selection.ts', {}), '@/lib/project-validation-workflow': loadTs('src/lib/project-validation-workflow.ts', {}), '@/lib/notifications': { notifyWorkflow: async () => ({ sent: 0, recipients: [] }), actionNote: () => '', automaticNote: () => '' }, '@/lib/api': api, '@/lib/supabase-data': data, 'next/server': { NextResponse: { json: (body, init) => response(init?.status ?? 200, body) } } };
+const mocks = { '@/lib/inspection-notification-queue': { queueInspectionNotification: async () => {}, sendQueuedInspectionNotifications: async () => [{sent:1,fullySent:true}] }, '@/lib/project-form-validation': loadTs('src/lib/project-form-validation.ts', {}), '@/lib/inspection-selection': loadTs('src/lib/inspection-selection.ts', {}), '@/lib/project-validation-workflow': loadTs('src/lib/project-validation-workflow.ts', {}), '@/lib/notifications': { notifyWorkflow: async () => ({ sent: 0, recipients: [] }), actionNote: () => '', automaticNote: () => '' }, '@/lib/api': api, '@/lib/supabase-data': data, 'next/server': { NextResponse: { json: (body, init) => response(init?.status ?? 200, body) } } };
 const routes = Object.fromEntries(['local-road', 'maintenance', 'inspections'].map((name) => [name, loadTs(`src/app/api/${name}/route.ts`, mocks)]));
 function request(body = {}, query = '') { return { url: `https://example.test/api?${query}`, json: async () => body }; }
 
@@ -499,4 +499,14 @@ test('later annual inspection and maintenance dates use the requested year and l
     data.listMaintenance=async()=>[{...base,id:'m',status:'Completed',dateStarted:'2026-11-12',scheduledDate:'2026-11-12',completedDate:'2026-11-12'}];
     assert.equal((await routes.maintenance.PATCH(request({...base,id:'m',dateStarted:'2026-11-13',scheduledDate:'2026-11-13'}))).status,400);
   } finally {Object.assign(data,old);}
+});
+
+test('a project refresh attempts due validation reminders immediately without blocking projects on failure', async()=>{
+  role='validator'; let attempts=0;
+  const route=loadTs('src/app/api/local-road/route.ts',{
+    ...mocks,
+    '@/lib/supabase-data': {...data,listRoads:async()=>[{id:'p'}],listArchivedRoads:async()=>[]},
+    '@/lib/send-validation-reminders': {sendValidationReminders:async(_admin,projects,limit)=>{attempts++;assert.equal(projects[0].id,'p');assert.equal(limit,4);throw Error('SMTP unavailable');}},
+  });
+  const response=await route.GET({}); assert.equal(response.status,200);assert.equal(attempts,1);assert.equal(response.body.data[0].id,'p');role=null;
 });

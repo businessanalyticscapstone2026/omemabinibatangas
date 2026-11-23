@@ -44,6 +44,7 @@ function baseMocks(state) {
       withRefresh: (response) => response,
     },
     '@/lib/notifications': notifications,
+    '@/lib/inspection-notification-queue': { queueInspectionNotification: async (_db, _id, projectName, note) => { emails.push({projectName,note,kind:'inspection-recorded'}); }, sendQueuedInspectionNotifications: async () => [{sent:1,fullySent:true}] },
     '@/lib/project-validation-workflow': workflow,
     '@/lib/project-form-validation': formValidation,
     '@/lib/supabase-data': state.data,
@@ -226,7 +227,7 @@ test('a logging or notification failure after recording does not report the insp
   }};
   const mocks=baseMocks(state);
   mocks['@/lib/inspection-selection']={validateAssessment:()=>true,findingsSummary:()=>''};
-  mocks['@/lib/notifications']={actionNote:()=>'',notifyWorkflow:async()=>{throw Error('email offline');}};
+  mocks['@/lib/inspection-notification-queue']={queueInspectionNotification:async()=>{throw Error('queue offline');},sendQueuedInspectionNotifications:async()=>[]};
   const route=load('src/app/api/inspections/route.ts',mocks);
   const response=await route.PUT(request({id:'scheduled',localRoadId:'p',date:'2026-01-01',inspectionType:'Monitoring and Maintenance Inspection',conditionRating:9,conditionRatings:{},conditionRemarks:{},conditionAttachments:{}}));
   assert.equal(response.status,200); assert.equal(response.body.success,true); assert.match(response.body.notificationWarning,/Inspection saved/);

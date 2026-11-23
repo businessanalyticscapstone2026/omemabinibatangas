@@ -63,6 +63,13 @@ export async function GET(request: Request) {
   if (!auth) return unauthorized();
   try {
     const [data, archived] = await Promise.all([listRoads(auth.db, auth.admin), listArchivedRoads(auth.db)]);
+    // Generating a due annual entry happens during project refresh. Attempt its
+    // notification now instead of waiting until the next daily cron run.
+    // Failures remain retryable and never prevent projects from loading.
+    try {
+      const { sendValidationReminders } = await import('@/lib/send-validation-reminders');
+      await sendValidationReminders(auth.admin, data as never, 4);
+    } catch (error) { console.error('Project list loaded; validation reminders could not be sent.', error); }
     if (auth.profile.roleDb === 'inspector') {
       // Former inspectors still need the project and road context for their own
       // inspection history. This does not grant access to other inspections.
