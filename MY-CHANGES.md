@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-23 — [mine] Remove automated validation window text from email
+- **Type:** Modified
+- **Files:** `src/app/api/validation-reminders/route.ts` (modified), `src/lib/supabase-data.ts` (modified), `tests/automatic-validation-email.test.cjs` (modified)
+- **What & why:** Keep the For Validation notification free of the automatic window date line.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-23 — [mine] Notify staff when annual validations and inspections are recorded
 - **Type:** Modified
 - **Files:** `src/app/api/inspections/route.ts` (modified), `src/app/api/maintenance/route.ts` (modified), `src/lib/supabase-data.ts` (modified), `tests/automatic-validation-email.test.cjs` (new)

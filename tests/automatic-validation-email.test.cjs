@@ -15,7 +15,7 @@ test('creating a due annual entry immediately emails the validator once and reco
   }};
   const data=load('src/lib/supabase-data.ts',{'@/lib/attachment-validation':load('src/lib/attachment-validation.ts'),'@/lib/project-form-validation':load('src/lib/project-form-validation.ts'),'@/lib/supabase':{ROLE_FROM_DB:{},ROLE_TO_DB:{}},'@/lib/notifications':{automaticNote:x=>x,notifyWorkflow:async(_admin,opts)=>{emails.push(opts);return {sent:1,recipients:['validator@example.test']};}}});
   try {global.Date=Clock;await data.ensureAnnualFollowUps(db,db);await data.ensureAnnualFollowUps(db,db);} finally {global.Date=RealDate;}
-  assert.equal(emails.length,1);assert.equal(emails[0].kind,'for-validation');assert.equal(emails[0].projectName,'Sample Road');
+  assert.equal(emails.length,1);assert.equal(emails[0].kind,'for-validation');assert.equal(emails[0].projectName,'Sample Road');assert.equal(emails[0].note,undefined);
   assert.equal(logs.length,1);assert.equal(logs[0].action,'Validation Reminder Sent');assert.match(logs[0].details.message,/^p 2026 — Sample Road$/);
 });
 

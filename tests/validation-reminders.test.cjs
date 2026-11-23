@@ -49,14 +49,14 @@ test('assignment requires the latest decision to be Validated', () => {
 });
 
 function routeHarness({ historyFails = false, sent = 0 } = {}) {
-  let markers = []; let sends = 0;
+  let markers = []; let sends = 0; let lastOptions;
   const route = load('src/app/api/validation-reminders/route.ts', {
     'next/server': { NextResponse: { json: (body, init) => ({ body, status: init?.status || 200 }) } },
     '@/lib/api': { requireAuth: async () => null, unauthorized: () => ({ status: 401 }), forbidden: () => ({ status: 403 }) },
     '@/lib/supabase': { createAdminClient: () => ({}) },
     '@/lib/retention': { cronAuthorized: headers => headers.get('authorization') === 'Bearer test' },
     '@/lib/validation-reminders': { ...reminders, pendingValidationReminders: (_p, logs) => logs.length ? [] : [{ id: 'p', year: 2026, name: 'Road' }] },
-    '@/lib/notifications': { automaticNote: x => x, notifyWorkflow: async () => { sends++; return { sent }; } },
+    '@/lib/notifications': { notifyWorkflow: async (_db, options) => { sends++; lastOptions = options; return { sent }; } },
     '@/lib/supabase-data': {
       listRoads: async () => [project],
       listValidationReminderLogs: async () => { if (historyFails) throw Error('unavailable'); return markers; },
@@ -64,7 +64,7 @@ function routeHarness({ historyFails = false, sent = 0 } = {}) {
     },
   });
   const req = authorization => ({ headers: { get: name => name === 'authorization' ? authorization : '1' } });
-  return { route, req, count: () => sends, markers: () => markers };
+  return { route, req, count: () => sends, markers: () => markers, options: () => lastOptions };
 }
 test('spoofed cron header is not authorization', async () => {
   const h = routeHarness();
@@ -77,6 +77,8 @@ test('successful reminder is marked and not resent on sequential runs', async ()
   await h.route.GET(h.req('Bearer test'));
   assert.equal(h.count(), 1);
   assert.equal(h.markers().length, 1);
+  assert.equal(h.options().kind, 'for-validation');
+  assert.equal(h.options().note, undefined);
 });
 test('unconfigured mail remains retryable; unreadable history stops sending', async () => {
   const h = routeHarness();

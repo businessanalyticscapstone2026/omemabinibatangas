@@ -320,11 +320,10 @@ export async function ensureAnnualFollowUps(db: SupabaseClient, admin?: Supabase
         if (insertError) throw insertError;
         if (admin && inserted?.length) {
           try {
-            const { notifyWorkflow, automaticNote } = await import('@/lib/notifications');
+            const { notifyWorkflow } = await import('@/lib/notifications');
             const name = str(project.project_name);
             const result = await notifyWorkflow(admin, {
               kind: 'for-validation', projectName: name,
-              note: automaticNote(`the ${year} validation window opened on ${validationDue}`),
             });
             // Preserve the existing cron's project/year marker only after all
             // intended recipients were accepted by the mail server.

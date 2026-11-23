@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireAuth, unauthorized, forbidden } from '@/lib/api';
 import { recordValidationReminder, listValidationReminderLogs, listRoads } from '@/lib/supabase-data';
-import { automaticNote, notifyWorkflow } from '@/lib/notifications';
+import { notifyWorkflow } from '@/lib/notifications';
 import { cronAuthorized } from '@/lib/retention';
 import { createAdminClient } from '@/lib/supabase';
 import {
@@ -33,11 +33,6 @@ async function runValidationReminders(db: SupabaseClient, admin: SupabaseClient)
       const result = await notifyWorkflow(admin as never, {
         kind: 'for-validation',
         projectName: reminder.name,
-        note: automaticNote(
-          reminder.dueDate
-            ? `the ${reminder.year} validation window opened on ${reminder.dueDate}`
-            : `the ${reminder.year} validation window is open`,
-        ),
       });
       sent = result.sent;
       skipped = result.skipped;
