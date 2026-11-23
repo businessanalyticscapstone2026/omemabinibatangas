@@ -24,6 +24,7 @@ interface AIPredictionModuleProps {
 }
 
 const actionableRatings = new Set(['Fair', 'Poor', 'Bad']);
+const showProgress = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 function isActionableAssessment(assessment: Record<string, string> | undefined): boolean {
   return Object.values(assessment || {}).some((rating) => actionableRatings.has(rating));
@@ -112,6 +113,8 @@ export function AIPredictionModule({
       if (!response.ok) throw new Error(payload?.message || 'Unable to generate recommendations.');
       if (!Array.isArray(payload?.data) || payload.data.length !== items.length) throw new Error('The AI service returned an invalid response.');
       setCurrentStep(2);
+      // Let the browser render each real stage before the synchronous work finishes.
+      await showProgress(250);
       const seen = new Set<string>();
       const results: PredictionResult[] = payload.data.map((prediction: any) => {
         const item = items.find(item => item.id === prediction.localRoadId);
@@ -126,6 +129,10 @@ export function AIPredictionModule({
       const replaced = new Set(results.map(result => result.localRoadId));
       state.current.onPredictionsChange([...state.current.predictions.filter(item => !replaced.has(item.localRoadId)), ...results]);
       if (payload.persistenceWarning) setErrorMessage(payload.persistenceWarning);
+      await showProgress(250);
+      setCurrentStep(steps.length);
+      // Keep the completed checklist visible before returning to the results.
+      await showProgress(1000);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to generate recommendations.');
     } finally {
@@ -170,7 +177,9 @@ export function AIPredictionModule({
       {loading && (
         <div className="bg-white rounded-xl shadow-lg p-12 flex flex-col items-center justify-center">
           <Loader2 className="w-10 h-10 text-[#0ea5e9] animate-spin mb-6" />
-          <h2 className="text-lg font-bold text-[#0ea5e9] mb-6">{steps[currentStep]}...</h2>
+          <h2 className="text-lg font-bold text-[#0ea5e9] mb-6" aria-live="polite">
+            {currentStep === steps.length ? 'Recommendations ready' : `${steps[currentStep]}...`}
+          </h2>
 
           <div className="w-full max-w-lg bg-gray-50 rounded-lg p-6 space-y-3">
             {steps.map((step, index) => (
