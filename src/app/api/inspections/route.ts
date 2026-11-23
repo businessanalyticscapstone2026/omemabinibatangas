@@ -4,8 +4,7 @@ import { hasFourDigitYear, addCalendarDays, anniversaryMinusDays, INSPECTION_DAY
 import { NextResponse } from 'next/server';
 import { requireAuth, requireRole, unauthorized, withRefresh } from '@/lib/api';
 // @mine — step 6: email 6, Inspector → Encoder, so the repair can be scheduled.
-import { actionNote } from '@/lib/notifications';
-import { queueInspectionNotification, sendQueuedInspectionNotifications } from '@/lib/inspection-notification-queue';
+import { actionNote, notifyWorkflow } from '@/lib/notifications';
 import {
   addActivityLog, archiveInspection, listArchivedInspections, listInspections, listRoads, listMaintenance, listArchivedMaintenance,
   permanentlyDeleteInspection, restoreInspection, saveInspection, saveRoad, type StoredRecord,
@@ -96,9 +95,18 @@ function notAssignedToInspector(auth: { profile: { roleDb: string }; userId: str
 
 /** Notify on first result recording, whether POST or a scheduled-row PUT. */
 async function notifyInspectionRecorded(auth: NonNullable<Awaited<ReturnType<typeof requireAuth>>>, road: StoredRecord, inspection: StoredRecord) {
-  await queueInspectionNotification(auth.admin, String(inspection.id), String(road.projectName || road.name || ''), actionNote(auth.profile));
-  const [result] = await sendQueuedInspectionNotifications(auth.admin, String(inspection.id));
-  return result?.fullySent ? undefined : 'Inspection saved, but the email was not fully sent. It is queued for retry; do not resubmit the inspection.';
+  const notification = await notifyWorkflow(auth.admin, {
+    kind: 'inspection-recorded',
+    projectName: String(road.projectName || road.name || ''),
+    note: actionNote(auth.profile),
+  });
+  const notificationWarning = notification.sent === 0
+    ? `Inspection saved, but its email was not sent (${notification.skipped || 'delivery failed'}). Please contact the Head Engineer; do not resubmit the inspection.`
+    : notification.sent < notification.recipients.length
+      ? 'Inspection saved, but email delivery failed for some recipients. Please contact the Head Engineer.' : undefined;
+  await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username,
+    action: 'Inspection Email Delivery', details: `Inspection ${inspection.id}: sent ${notification.sent} of ${notification.recipients.length}; ${notification.skipped || (notificationWarning ? 'delivery incomplete' : 'delivered')}.` });
+  return notificationWarning;
 }
 
 export async function POST(request: Request) {

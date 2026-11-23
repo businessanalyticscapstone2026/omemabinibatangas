@@ -3,17 +3,18 @@
 // told the project is waiting. Encoding a project sends nothing.
 //
 // Runs daily from Vercel Cron (vercel.json), and the Head Engineer can run it by hand.
-// Interactive project refreshes also attempt reminders. Database leases prevent
-// concurrent sends; failed inspection notifications are retried here too.
+// One email per project per validation year, recorded in the activity log so a repeat
+// run — or the next day's run — never sends it twice.
 import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireAuth, unauthorized, forbidden } from '@/lib/api';
-import { listRoads } from '@/lib/supabase-data';
-import { sendValidationReminders } from '@/lib/send-validation-reminders';
-import { sendQueuedInspectionNotifications } from '@/lib/inspection-notification-queue';
-import type { ReminderProject } from '@/lib/validation-reminders';
+import { recordValidationReminder, listValidationReminderLogs, listRoads } from '@/lib/supabase-data';
+import { automaticNote, notifyWorkflow } from '@/lib/notifications';
 import { cronAuthorized } from '@/lib/retention';
 import { createAdminClient } from '@/lib/supabase';
+import {
+  pendingValidationReminders, reminderDetails,
+} from '@/lib/validation-reminders';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,11 +22,41 @@ export const dynamic = 'force-dynamic';
 /** @mine — send every reminder that is owed; returns what happened, never throws. */
 async function runValidationReminders(db: SupabaseClient, admin: SupabaseClient) {
   const projects = await listRoads(db, admin);
-  const [reminders, inspectionNotifications] = await Promise.all([
-    sendValidationReminders(admin, projects as unknown as ReminderProject[]),
-    sendQueuedInspectionNotifications(admin),
-  ]);
-  return { ...reminders, inspectionNotifications };
+  const logs = await listValidationReminderLogs(admin);
+  const due = pendingValidationReminders(projects, logs);
+
+  const reminders: Array<{ id: string; year: number; name: string; sent: number; skipped?: string }> = [];
+  for (const reminder of due) {
+    let sent = 0;
+    let skipped: string | undefined;
+    try {
+      const result = await notifyWorkflow(admin as never, {
+        kind: 'for-validation',
+        projectName: reminder.name,
+        note: automaticNote(
+          reminder.dueDate
+            ? `the ${reminder.year} validation window opened on ${reminder.dueDate}`
+            : `the ${reminder.year} validation window is open`,
+        ),
+      });
+      sent = result.sent;
+      skipped = result.skipped;
+    } catch (error) {
+      console.error('Could not send a validation reminder.', error);
+    }
+    // Only a message that actually left the building is recorded, so a missing
+    // mailbox delays the reminder instead of swallowing it for the whole year.
+    if (sent > 0) {
+      await recordValidationReminder(admin, reminderDetails(reminder.id, reminder.year, reminder.name));
+    }
+    reminders.push({ id: reminder.id, year: reminder.year, name: reminder.name, sent, skipped });
+  }
+
+  return {
+    due: reminders.length,
+    sent: reminders.reduce((total, item) => total + item.sent, 0),
+    reminders,
+  };
 }
 
 export async function GET(request: Request) {

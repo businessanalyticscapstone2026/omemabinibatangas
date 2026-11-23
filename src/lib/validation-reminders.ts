@@ -7,7 +7,7 @@
 //
 // So the selection lives here, pure and testable: given the projects and what has
 // already been sent, which reminders are still owed today?
-import { anniversaryMinusDays, hasFourDigitYear, VALIDATION_DAYS_BEFORE } from '@/lib/project-form-validation';
+import { validationTask } from '@/lib/project-validation-workflow';
 
 export const VALIDATION_REMINDER_ACTION = 'Validation Reminder Sent';
 
@@ -59,19 +59,19 @@ export function pendingValidationReminders(
   const takenInThisRun: Record<string, true> = {};
   for (const project of projects ?? []) {
     if (project.archivedAt) continue;
-    const completion = project.actualCompletionDate;
-    if (!completion || !hasFourDigitYear(completion)) continue;
-    const today = now.toISOString().slice(0, 10);
-    for (const entry of project.annualValidationEntries ?? []) {
-      // A revised submission has its own Information Updated notification.
-      if (entry.result !== 'Pending' || entry.remarks?.trim() || entry.year <= Number(completion.slice(0, 4))) continue;
-      const dueDate = anniversaryMinusDays(completion, entry.year, VALIDATION_DAYS_BEFORE);
-      if (!dueDate || dueDate > today) continue;
-      const marker = reminderMarker(project.id, entry.year);
-      if (alreadySent[marker] || takenInThisRun[marker]) continue;
-      takenInThisRun[marker] = true;
-      due.push({ id: project.id, year: entry.year, name: String(project.projectName || project.name || ''), dueDate });
-    }
+    const task = validationTask(project, now);
+    // No open window, or this year's decision already exists (the return-for-revision
+    // and validated emails are their own messages).
+    if (!task || task.result) continue;
+    const marker = reminderMarker(project.id, task.year);
+    if (alreadySent[marker] || takenInThisRun[marker]) continue;
+    takenInThisRun[marker] = true;
+    due.push({
+      id: project.id,
+      year: task.year,
+      name: String(project.projectName || project.name || ''),
+      ...(task.dueDate ? { dueDate: task.dueDate } : {}),
+    });
   }
   return due;
 }

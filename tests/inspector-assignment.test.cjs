@@ -230,7 +230,6 @@ function inspectionRoutes(state) {
   return load('src/app/api/inspections/route.ts', {
     'next/server': { NextResponse: { json: (body, init) => res(init?.status || 200, body) } },
     '@/lib/inspection-selection': load('src/lib/inspection-selection.ts'),
-    '@/lib/inspection-notification-queue': { queueInspectionNotification: async () => {}, sendQueuedInspectionNotifications: async () => [{sent:1,fullySent:true}] },
     '@/lib/project-form-validation': load('src/lib/project-form-validation.ts'),
     '@/lib/notifications': { notifyWorkflow: async () => ({ sent: 0, recipients: [] }), actionNote: () => '', automaticNote: () => '' }, '@/lib/api': {
       requireAuth: async () => auth(),

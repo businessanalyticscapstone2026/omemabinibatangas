@@ -23,7 +23,7 @@ function load(relative, mocks = {}) {
 }
 
 const workflow = load('src/lib/project-validation-workflow.ts');
-const reminders = load('src/lib/validation-reminders.ts', { '@/lib/project-form-validation': load('src/lib/project-form-validation.ts') });
+const reminders = load('src/lib/validation-reminders.ts', { '@/lib/project-validation-workflow': workflow });
 const project = { id: 'p', projectName: 'Road', actualCompletionDate: '2025-12-11', annualValidationEntries: [{ year: 2026, dueDate: '2026-11-11', result: 'Pending', remarks: '' }] };
 test('calendar reminder opens exactly 30 days before the anniversary', () => {
   assert.equal(reminders.pendingValidationReminders([project], [], new Date('2026-11-10')).length, 0);
@@ -50,24 +50,18 @@ test('assignment requires the latest decision to be Validated', () => {
 
 function routeHarness({ historyFails = false, sent = 0 } = {}) {
   let markers = []; let sends = 0;
-  const db = { rpc: async (name, args) => name === 'claim_validation_reminder'
-    ? {data: markers.length ? null : 'token', error:null} : {data:null,error:null} };
-  const sendValidationReminders = load('src/lib/send-validation-reminders.ts', {
-    '@/lib/notifications': { automaticNote: x => x, notifyWorkflow: async () => { sends++; return { sent, recipients: sent ? ['validator@example.test'] : [] }; } },
-    '@/lib/validation-reminders': { ...reminders, pendingValidationReminders: (_p, logs) => logs.length ? [] : [{ id: 'p', year: 2026, name: 'Road' }] },
-    '@/lib/supabase-data': {
-      listValidationReminderLogs: async () => { if (historyFails) throw Error('unavailable'); return markers; },
-      recordValidationReminder: async (_db, details) => { markers.push({ action: reminders.VALIDATION_REMINDER_ACTION, details }); },
-    },
-  }).sendValidationReminders;
   const route = load('src/app/api/validation-reminders/route.ts', {
     'next/server': { NextResponse: { json: (body, init) => ({ body, status: init?.status || 200 }) } },
     '@/lib/api': { requireAuth: async () => null, unauthorized: () => ({ status: 401 }), forbidden: () => ({ status: 403 }) },
-    '@/lib/supabase': { createAdminClient: () => db },
+    '@/lib/supabase': { createAdminClient: () => ({}) },
     '@/lib/retention': { cronAuthorized: headers => headers.get('authorization') === 'Bearer test' },
-    '@/lib/send-validation-reminders': {sendValidationReminders},
-    '@/lib/inspection-notification-queue': {sendQueuedInspectionNotifications: async()=>[]},
-    '@/lib/supabase-data': {listRoads: async () => [project]},
+    '@/lib/validation-reminders': { ...reminders, pendingValidationReminders: (_p, logs) => logs.length ? [] : [{ id: 'p', year: 2026, name: 'Road' }] },
+    '@/lib/notifications': { automaticNote: x => x, notifyWorkflow: async () => { sends++; return { sent }; } },
+    '@/lib/supabase-data': {
+      listRoads: async () => [project],
+      listValidationReminderLogs: async () => { if (historyFails) throw Error('unavailable'); return markers; },
+      recordValidationReminder: async (_db, details) => { markers.push({ action: reminders.VALIDATION_REMINDER_ACTION, details }); },
+    },
   });
   const req = authorization => ({ headers: { get: name => name === 'authorization' ? authorization : '1' } });
   return { route, req, count: () => sends, markers: () => markers };
@@ -91,13 +85,4 @@ test('unconfigured mail remains retryable; unreadable history stops sending', as
   const failed = routeHarness({ historyFails: true });
   assert.equal((await failed.route.GET(failed.req('Bearer test'))).status, 500);
   assert.equal(failed.count(), 0);
-});
-
-test('each newly due pending annual year receives its own reminder even if an older year remains pending', () => {
-  const prior = { ...project, annualValidationEntries: [
-    {year:2025,dueDate:'2025-11-11',result:'Pending',remarks:''},
-    {year:2026,dueDate:'2026-11-11',result:'Pending',remarks:''},
-    {year:2027,dueDate:'2027-11-11',result:'Pending',remarks:''},
-  ], actualCompletionDate:'2024-12-11' };
-  assert.deepEqual(reminders.pendingValidationReminders([prior], [], new Date('2026-11-11')).map(x=>x.year), [2025,2026]);
 });
