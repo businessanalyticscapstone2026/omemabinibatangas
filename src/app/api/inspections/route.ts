@@ -138,13 +138,19 @@ export async function POST(request: Request) {
   if (payload.date < minimum) return NextResponse.json({ message: 'Please fill out valid date.' }, { status: 400 });
   try {
     const inspection = await saveInspection(auth.db, { ...payload, id: '' }, road.id, auth.userId);
-    await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Inspection Created', details: `Created inspection ${inspection.id}` });
+    try { await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Inspection Created', details: `Created inspection ${inspection.id}` }); }
+    catch (error) { console.error('Inspection saved; activity logging failed.', error); }
     // The database trigger synchronizes condition. A secondary read must not prevent
     // notification after the inspection has already been committed.
     try { await refreshRoadCondition(auth, road.id); }
     catch (error) { console.error('Inspection saved; condition refresh failed.', error); }
     // Email 6 — the Head Engineer schedules the repair next, the encoder is told it is done.
-    const notificationWarning = await notifyInspectionRecorded(auth, road, inspection);
+    let notificationWarning: string | undefined;
+    try { notificationWarning = await notifyInspectionRecorded(auth, road, inspection); }
+    catch (error) {
+      console.error('Inspection saved; notification failed.', error);
+      notificationWarning = 'Inspection saved, but its email could not be confirmed. Please contact the Head Engineer; do not resubmit.';
+    }
     return withRefresh(NextResponse.json({ success: true, data: inspection, notificationWarning }), auth);
   } catch (error) {
     console.error('Failed to create inspection.', error);
@@ -200,11 +206,19 @@ export async function PUT(request: Request) {
       }
     }
     const inspection = await saveInspection(auth.admin, { ...existing, ...payload, id: existing.id, annualFollowUpYear: existing.annualFollowUpYear, validationStatus: existing.validationStatus }, road.id, auth.userId, existing.isScheduledAnnualFollowUp === true);
-    await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Inspection Updated', details: `Updated inspection ${inspection.id}` });
-    // This flag is read from the stored row, never trusted from the request.
-    // Scheduled placeholders exist before any results have been recorded.
-    const notificationWarning = existing.isScheduledAnnualFollowUp === true
-      ? await notifyInspectionRecorded(auth, road, inspection) : undefined;
+    // Logging and email are secondary to the committed inspection. A failure
+    // here must not tell the inspector that the already-saved result failed.
+    let notificationWarning: string | undefined;
+    try {
+      await addActivityLog(auth.admin, { userId: auth.userId, user: auth.profile.username, action: 'Inspection Updated', details: `Updated inspection ${inspection.id}` });
+    } catch (error) { console.error('Inspection saved; activity logging failed.', error); }
+    if (existing.isScheduledAnnualFollowUp === true) {
+      try { notificationWarning = await notifyInspectionRecorded(auth, road, inspection); }
+      catch (error) {
+        console.error('Inspection saved; notification failed.', error);
+        notificationWarning = 'Inspection saved, but its email could not be confirmed. Please contact the Head Engineer; do not resubmit.';
+      }
+    }
     let roadUpdate = null;
     try { roadUpdate = await refreshRoadCondition(auth, road.id); }
     catch (error) { console.error('Inspection saved; condition refresh failed.', error); }

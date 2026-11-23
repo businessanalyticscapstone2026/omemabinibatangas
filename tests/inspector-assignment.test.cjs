@@ -347,3 +347,15 @@ test('a later validated inspection cannot be recorded while an earlier validated
   assert.equal(blocked.status,409); assert.match(blocked.body.message,/earlier validated/);
   assert.equal((await route.PUT(request({...first,...form}))).status,200);
 });
+
+test('former inspector keeps the first follow-up card after another inspector records a later follow-up', async () => {
+  const selection=load('src/lib/inspection-selection.ts');
+  const road={id:'p',inspectorId:'new',annualValidationEntries:[{year:2024,result:'Validated'},{year:2025,result:'Validated'}]};
+  const first={id:'first',localRoadId:'p',date:'2024-10-16',annualFollowUpYear:2024,inspectorId:'first-inspector',inspector:'First Inspector'};
+  const second={id:'second',localRoadId:'p',date:'2025-10-16',annualFollowUpYear:2025,inspectorId:'new',inspector:'New Inspector'};
+  const state={roleDb:'inspector',userId:'first-inspector',roads:[road],inspections:[first,second]};
+  const visible=(await inspectionRoutes(state).GET(request({}))).body.data;
+  assert.deepEqual(visible.map(i=>i.id),['first']);
+  assert.deepEqual(selection.inspectionCardsByValidation(visible,[road]).map(i=>i.id),['first']);
+  assert.equal(visible[0].canEdit,false);
+});

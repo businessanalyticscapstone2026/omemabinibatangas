@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-23 — [mine] Preserve inspectors on annual inspection results
+- **Type:** Modified
+- **Files:** `src/app/api/inspections/route.ts` (modified), `src/app/components/InspectionModule.tsx` (modified), `tests/inspection-categories.test.cjs` (modified), `tests/inspector-assignment.test.cjs` (modified), `tests/workflow-emails.test.cjs` (modified), `supabase/migrations/20261125_finish_annual_inspection_summary.sql` (new), `tests/annual-inspection-summary.test.cjs` (new)
+- **What & why:** Keep the recorded inspector and historical card, and prevent item-summary triggers from rejecting a completed submission.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-22 — [mine] Generate AI recommendations automatically for new inspections
 - **Type:** Modified
 - **Files:** `src/app/App.tsx` (modified), `src/app/api/ai-priority/route.ts` (modified), `src/app/components/AIPredictionModule.tsx` (modified), `src/lib/supabase-data.ts` (modified), `tests/project-form.test.cjs` (modified), `tests/ai-persistence.test.cjs` (new)

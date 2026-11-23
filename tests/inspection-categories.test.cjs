@@ -484,3 +484,19 @@ test('inspection view and print place full-width location above road information
   assert.ok(printDetails.every(section=>!section.fields.some(field=>field.label==='Follow-up Status')));
   act(()=>root.unmount());container.remove();
 });
+
+test('inspector is shown on the recording form and on completed results in view and print', async () => {
+  const {container,root}=renderModule([pendingInspection]);
+  openPendingForm(container);
+  assert.equal(container.querySelector('#inspection-inspector').value,'gabriel mendoza');
+  act(()=>root.unmount());container.remove();
+  const completed={...pendingInspection,isScheduledAnnualFollowUp:false,annualFollowUpYear:2026,inspector:'Joy Agkis',conditionRating:9,conditionRatings:{Concrete:'Good'}};
+  const view=renderModule([completed],'Head Engineer');
+  await act(async()=>view.container.querySelector('[aria-label^="View full inspection"]').click());
+  const dialog=view.container.querySelector('.inspection-detail-dialog');
+  assert.match(dialog.textContent,/Joy Agkis/);
+  await act(async()=>[...dialog.querySelectorAll('button')].find(b=>b.textContent.includes('Print')).click());
+  const details=printedDocuments.at(-1).sections.find(s=>s.title==='Inspection Details · Annual Follow-up 2026');
+  assert.equal(details.fields.find(f=>f.label==='Inspector').value,'Joy Agkis');
+  act(()=>view.root.unmount());view.container.remove();
+});
