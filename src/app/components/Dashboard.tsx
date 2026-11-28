@@ -249,7 +249,7 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange, a
         </section>
       </div>
 
-      {!analyticsSummary && <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
         <section className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-md">
           <div className="flex items-start justify-between border-b border-slate-100 pb-3">
             <div>
@@ -299,7 +299,7 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange, a
           </div>
           <p className="border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-700">{recentAnalysis}</p>
         </section>
-      </div>}
+      </div>
     </div>
   );
 }

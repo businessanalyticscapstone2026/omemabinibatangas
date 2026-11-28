@@ -36,8 +36,8 @@ test('overview welcomes each signed-in user by the provided name', () => {
 
 test('analytics displays dashboard summaries and requested distributions', () => {
   const html = renderToStaticMarkup(React.createElement(AnalyticsDashboard, { localRoadData: [], inspections: [], maintenanceRecords: [], onTabChange() {} }));
-  for (const label of ['Total Road Network', 'High Risk Road Sections', 'Good Pavement State', 'Recent Road Audits', 'Roads by Category', 'Pavement Condition Distribution', 'Pavement Type Ratio', 'Maintenance Status Distribution']) assert.ok(html.includes(label), label);
-  for (const removed of ['Total Road Project Investment', 'Barangays Covered', 'Barangay Road Classification', 'Monthly Road Inspection Trend']) assert.ok(!html.includes(removed), removed);
+  for (const label of ['Total Road Network', 'High Risk Road Sections', 'Good Pavement State', 'Recent Road Audits', 'Roads by Category', 'Pavement Condition Distribution', 'Pavement Type Ratio', 'Maintenance Status Distribution', 'Monthly Road Inspection Trend', 'Recent Road Field Inspections']) assert.ok(html.includes(label), label);
+  for (const removed of ['Total Road Project Investment', 'Barangays Covered', 'Barangay Road Classification']) assert.ok(!html.includes(removed), removed);
   assert.ok(html.includes('No maintenance records available.'));
 });
 
