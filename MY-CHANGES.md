@@ -995,3 +995,9 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 - Inspector inspection management uses a date filter instead of status tabs and no longer offers Add Inspection. The editable form offers the single Monitoring and Maintenance Inspection type and removes the final general attachment field while keeping per-category and previously saved attachments.
 - Added nullable `inspections.inspection_purpose` to store the selected type independently of the annual follow-up enum. The additive migration was applied to shared Supabase with explicit owner approval; no existing records were removed or modified.
+
+### Validation-gated assignment and role dashboards
+- Require an annual validated decision before assigning inspectors, including historical projects; retain access for an earlier validated follow-up when a later year is pending.
+- Replace Dashboard-only charts with role-specific assignment, validation, inspection and maintenance charts with live breakdowns and role-appropriate navigation; retain the separate Analytics charts and dashboard KPIs.
+- Limit inspector dashboard data to currently assigned projects and keep scheduled maintenance results out of the maintenance-needed chart.
+- Added role aggregation and assignment regression tests. TypeScript and production build passed; focused tests passed. The full suite reported two unrelated AI generation timing test failures.

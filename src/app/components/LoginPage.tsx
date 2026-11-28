@@ -18,7 +18,7 @@ import municipalityImage from '../../imports/Municipality of Mabini.jpg';
 import logoImage from '../../imports/logo.png';
 
 interface LoginPageProps {
-  onLogin: (role: string, username: string, email: string) => void;
+  onLogin: (role: string, username: string, email: string, userId: string) => void;
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
@@ -151,7 +151,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         return;
       }
 
-      onLogin(payload.role, payload.name, payload.email);
+      onLogin(payload.role, payload.name, payload.email, payload.id || '');
     } catch {
       setError('Authentication service is unavailable. Please try again.');
     }

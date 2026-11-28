@@ -855,15 +855,13 @@ test('task 11: the Head Engineer project table carries the five columns and an i
   assert.equal(pendingSelect.className,select.className);
   assert.match(pendingSelect.textContent, /Awaiting Validation/);
 
-  // Back-entered historical projects remain assignable even with pending annual validation.
+  // Historical projects also require a validated annual entry.
   await reset();
   const historicalItem = { ...pendingItem, actualCompletionDate: '2022-03-31' };
   await act(async () => root.render(React.createElement(LocalRoadList, { ...props, data: [historicalItem], userRole: 'Head Engineer' })));
   const historicalSelect = container.querySelector('select[aria-label="Assign inspector for Poblacion Road"]');
-  assert.equal(historicalSelect.disabled, false);
-  assert.match(historicalSelect.textContent, /Juan Dela Cruz/);
-  await act(async () => { historicalSelect.value = 'i1'; historicalSelect.dispatchEvent(new window.Event('change', { bubbles: true })); });
-  assert.deepEqual(assignments.at(-1), ['p', 'i1']);
+  assert.equal(historicalSelect.disabled, true);
+  assert.match(historicalSelect.textContent, /Awaiting Validation/);
 
   // task 13: both project lists filter by completion date instead of location
   for (const userRole of ['Head Engineer', 'Staff - Encoder']) {

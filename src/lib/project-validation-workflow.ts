@@ -55,14 +55,11 @@ export function hasPassedValidation(project: ValidationProject): boolean {
   return latest.result === 'Validated';
 }
 
-/** Allow historical projects to be assigned for back-entry without changing validation records. */
-export function canAssignInspector(project: ValidationProject, now = new Date()): boolean {
-  if (hasPassedValidation(project)) return true;
-  const raw = project.actualCompletionDate;
-  if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
-  const completed = new Date(`${raw}T00:00:00Z`);
-  return Number.isFinite(completed.getTime()) && completed.toISOString().slice(0, 10) === raw
-    && completed.getUTCFullYear() < now.getUTCFullYear();
+/** Assignment requires a real validation decision, including for historical projects.
+ * An earlier validated follow-up remains actionable when a later year is pending. */
+export function canAssignInspector(project: ValidationProject, _now = new Date()): boolean {
+  const entries = project.annualValidationEntries ?? [];
+  return entries.some(entry => entry.result === 'Validated') || (!entries.length && project.validationResult === 'Validated');
 }
 
 /** A validated project remains locked until a validator returns an annual entry. */

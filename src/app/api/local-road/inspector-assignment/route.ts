@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     const project = (await listRoads(auth.db, auth.admin)).find((record) => record.id === projectId);
     if (!project) return NextResponse.json({ message: 'Project not found.' }, { status: 404 });
 
-    // Historical completed projects may be assigned for back-entry; other projects
-    // still require validation. Clearing an assignment is always allowed.
+    // Every assignment requires validation, including historical projects.
+    // Clearing an existing assignment remains allowed.
     if (inspectorId && !canAssignInspector(project as unknown as ValidationProject)) {
       return NextResponse.json({ message: 'This project has not been validated yet, so an inspector cannot be assigned.' }, { status: 409 });
     }

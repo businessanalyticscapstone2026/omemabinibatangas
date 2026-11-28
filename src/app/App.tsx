@@ -10,7 +10,7 @@ const IDLE_WARNING_MS = 30 * 1000;
 import { LoginPage } from './components/LoginPage';
 import { Sidebar } from './components/Sidebar';
 import { SESSION_EXPIRED_EVENT, installSessionExpiryHandler } from '@/lib/session-expiry';
-import { Dashboard } from './components/Dashboard';
+import { RoleDashboard } from './components/RoleDashboard';
 import { LocalRoadList } from './components/LocalRoadList';
 import { LocalRoadForm } from './components/LocalRoadForm';
 import { InspectionModule } from './components/InspectionModule';
@@ -146,6 +146,7 @@ export default function App() {
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const [userRole, setUserRole] = useState('');
   const [userName, setUserName] = useState('');
+  const [userId, setUserId] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showLocalRoadForm, setShowLocalRoadForm] = useState(false);
@@ -340,6 +341,7 @@ export default function App() {
         if (cancelled || !payload?.role) return;
         setUserRole(payload.role);
         setUserName(payload.name || payload.username || '');
+        setUserId(payload.id || '');
         setUserEmail(payload.email || '');
         setActiveTab(payload.role === 'Staff - Inspector' ? 'inspection-management' : 'dashboard');
         setIsLoggedIn(true);
@@ -349,10 +351,11 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
-  const handleLogin = (role: string, username: string, email: string) => {
+  const handleLogin = (role: string, username: string, email: string, id: string) => {
     setLoading(true); setLocalRoadData([]); setInspections([]); setMaintenanceRecords([]);
     setUserRole(role);
     setUserName(username);
+    setUserId(id);
     setUserEmail(email);
     setActiveTab(role === 'Staff - Inspector' ? 'inspection-management' : 'dashboard');
     setIsLoggedIn(true);
@@ -374,6 +377,7 @@ export default function App() {
     setIsLoggedIn(false);
     setUserRole('');
     setUserName('');
+    setUserId('');
     setUserEmail('');
     setActiveTab('dashboard');
   };
@@ -766,10 +770,15 @@ export default function App() {
               className="col-start-1 row-start-1 min-h-full"
             >
               {activeTab === 'dashboard' && hasAccess('dashboard') && (
-                <Dashboard
+                <RoleDashboard
                   localRoadData={localRoadData}
                   inspections={inspections}
+                  maintenanceRecords={maintenanceRecords}
+                  scheduledInspectionIds={scheduledInspectionIds}
+                  scheduledArchivedInspections={scheduledArchivedInspections}
                   userName={userName}
+                  userRole={userRole}
+                  userId={userId}
                   onTabChange={setActiveTab}
                 />
               )}
