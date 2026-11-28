@@ -85,9 +85,9 @@ function DistributionChart({ title, description, data, emptyMessage, insight, le
               <span className="whitespace-nowrap text-[8px] leading-none tracking-wide text-slate-400">{centerLabel}</span>
             </div>}
           </div>
-          <div className={legendBelow ? 'grid w-full grid-cols-2 gap-1.5 sm:grid-cols-4' : 'space-y-1.5'} aria-label={`${title} breakdown`}>
-            {data.map(item => (
-              <div key={item.name} className={`flex items-center justify-between gap-1 rounded-md border border-slate-100 px-2 py-1.5 text-[9px] ${legendBelow ? 'min-w-0' : 'min-w-[130px]'}`} title={`${item.value} recorded`}>
+          <div className={legendBelow ? 'grid w-full grid-cols-2 gap-1.5 sm:grid-cols-12' : 'space-y-1.5'} aria-label={`${title} breakdown`}>
+            {data.map((item, index) => (
+              <div key={item.name} className={`flex items-center justify-between gap-1 rounded-md border border-slate-100 px-2 py-1.5 text-[9px] ${legendBelow ? `min-w-0 ${index < 8 ? 'sm:col-span-3' : 'sm:col-span-4'}` : 'min-w-[130px]'}`} title={`${item.value} recorded`}>
                 <span className="flex min-w-0 items-center gap-1.5 text-slate-600"><i className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />{item.name}</span>
                 <span className="shrink-0 font-medium text-slate-600">{Math.round(item.value / total * 100)}%</span>
               </div>

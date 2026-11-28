@@ -77,7 +77,9 @@ test('analytics displays chart descriptions, completed percentage and view-all b
   assert.ok(html.includes('Recorded pavement types and road elements across road projects'));
   assert.ok(html.includes('Local road maintenance activities by status'));
   assert.match(html, /50%<\/strong><span[^>]*>Completed<\/span>/);
-  assert.match(html, /grid-cols-2 gap-1.5 sm:grid-cols-4/);
+  assert.match(html, /grid-cols-2 gap-1.5 sm:grid-cols-12/);
+  assert.equal((html.match(/sm:col-span-3/g) || []).length, 8);
+  assert.equal((html.match(/sm:col-span-4/g) || []).length, 3);
   assert.match(html, /1 \(50%\) is completed/);
   assert.ok(html.includes('View All'));
 });
