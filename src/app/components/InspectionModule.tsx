@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PrintDocument, type PrintSection } from './PrintDocument';
 import { recordClientActivity } from '@/lib/activity-log-client';
-import { inspectionCardsByValidation, isPendingInspection, findingsSummary } from '@/lib/inspection-selection';
+import { inspectionCardsByValidation, isPendingInspection, findingsSummary, inspectionRatingScore, inspectionConditionLabel } from '@/lib/inspection-selection';
 import { hasFourDigitYear, anniversaryMinusDays, INSPECTION_DAYS_BEFORE, formatSavedProjectCurrency } from '@/lib/project-form-validation';
 import { attachmentError } from '@/lib/attachment-validation';
 
@@ -58,6 +58,9 @@ interface InspectionModuleProps {
   onDeleteInspection: (id: string) => Promise<boolean>;
   currentUser: string;
   userRole?: string;
+  /** Open the shared inspection detail dialog without the management page. */
+  detailInspectionId?: string;
+  onDetailClose?: () => void;
 }
 
 const inspectionFormTabs = [
@@ -230,7 +233,7 @@ function earliestInspectionDate(completionDate?: string, annualYear?: number | s
   return anniversaryMinusDays(completionDate, year, INSPECTION_DAYS_BEFORE);
 }
 
-export function InspectionModule({ inspections, localRoadList, onAddInspection, onEditInspection, onDeleteInspection, currentUser, userRole = '' }: InspectionModuleProps) {
+export function InspectionModule({ inspections, localRoadList, onAddInspection, onEditInspection, onDeleteInspection, currentUser, userRole = '', detailInspectionId, onDetailClose }: InspectionModuleProps) {
   // @mine — Admin accounts are displayed as Head Engineer.
   const isAdminReadDeleteOnly = ['Admin', 'Head Engineer'].includes(userRole);
   const [showForm, setShowForm] = useState(false);
@@ -241,7 +244,13 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
   const [inspectionView, setInspectionView] = useState<'history' | 'overview'>('history');
   const [filterDate, setFilterDate] = useState('');
   const filterDateRef = useRef<HTMLInputElement>(null);
-  const [selectedInspection, setSelectedInspection] = useState<{ inspection: Inspection; referenceId: string } | null>(null);
+  const [selectedInspection, setSelectedInspection] = useState<{ inspection: Inspection; referenceId: string } | null>(() => {
+    const inspection = inspections.find(item => item.id === detailInspectionId);
+    if (!inspection) return null;
+    const order = inspections.length - inspections.findIndex(item => item.id === inspection.id);
+    const year = (isPendingInspection(inspection) ? inspection.annualFollowUpYear : inspection.date?.slice(0, 4)) || new Date().getFullYear();
+    return { inspection, referenceId: `INSP-${year}-${String(order).padStart(3, '0')}` };
+  });
   const [pendingDelete, setPendingDelete] = useState<Inspection | null>(null);
   const [activeFormTab, setActiveFormTab] = useState<(typeof inspectionFormTabs)[number]['id']>('project');
   const formScrollRef = useRef<HTMLDivElement>(null);
@@ -325,24 +334,8 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
   const selectedProject = localRoadList.find(item => item.id === formData.localRoadId);
   const conditionRatingOptions = ['Good', 'Fair', 'Poor', 'Bad', 'N/A'];
 
-  const getRatingScore = (rating: number | string) => {
-    const numericRating = Number(rating);
-    if (Number.isFinite(numericRating)) return numericRating;
-    const normalizedRating = String(rating).toLowerCase();
-    if (normalizedRating === 'good') return 9;
-    if (normalizedRating === 'fair') return 7;
-    if (normalizedRating === 'poor') return 4;
-    if (normalizedRating === 'bad') return 2;
-    return 0;
-  };
-
-  const getConditionLabel = (inspection: Inspection) => {
-    const rating = getRatingScore(inspection.conditionRating);
-    if (rating >= 8) return 'Good';
-    if (rating >= 5) return 'Fair';
-    if (rating > 0) return 'Poor';
-    return 'Pending Validation';
-  };
+  const getRatingScore = inspectionRatingScore;
+  const getConditionLabel = (inspection: Inspection) => inspectionConditionLabel(inspection.conditionRating);
 
   const isPendingInspectionRecord = isPendingInspection;
 
@@ -659,6 +652,218 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
     setPrintSections(sections);
   };
 
+  const inspectionDialogs = <>
+        <Dialog
+          open={selectedInspection !== null}
+          onOpenChange={(open) => {
+            if (!open) { setSelectedInspection(null); onDetailClose?.(); }
+          }}
+        >
+          {selectedInspection && (() => {
+            const { inspection, referenceId } = selectedInspection;
+            const road = localRoadList.find((item) => item.id === inspection.localRoadId);
+            const projectName = road?.projectName || road?.name || inspection.projectName || inspection.localRoadName;
+
+            return (
+              <DialogContent className="inspection-detail-dialog card-details-dialog max-h-[min(620px,calc(100vh-32px))] overflow-hidden rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl sm:max-w-[840px]">
+                <div className="bg-gradient-to-r from-blue-700 to-blue-600 px-6 py-3 pr-14 text-white">
+                  <DialogTitle className="text-xl font-bold text-white">{projectName}</DialogTitle>
+                  <DialogDescription className="text-sm text-blue-100">Municipal Engineering Office · Inspection Entry · {referenceId}</DialogDescription>
+                </div>
+                <div className="max-h-[calc(min(620px,100vh-32px)-76px)] space-y-5 overflow-y-auto px-6 pb-8 pt-5">
+                  <section className="border-b pb-6">
+                    <h3 className="mb-4 text-lg font-semibold text-gray-900">Project Information</h3>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {[
+                      { label: 'Project / Program / Activity Name', value: projectName },
+                      { label: 'Project Category', value: road?.projectCategory || road?.type || inspection.projectCategory || 'Local Road' },
+                      { label: 'Location', value: road?.location || inspection.location || '', fullWidth: true },
+                    ].map(({ label, value, fullWidth }) => (
+                      <div key={label} className={fullWidth ? 'md:col-span-2' : undefined}>
+                        <span className="mb-2 block text-sm font-medium text-gray-700">{label}</span>
+                        <span className="block min-h-[3rem] whitespace-pre-wrap rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                  </section>
+
+                  <section className="border-b pb-6">
+                    <h3 className="mb-4 text-lg font-semibold text-gray-900">Road Information</h3>
+                    <div className="space-y-4">
+                      {[
+                        ['Road Network ID No.', road?.roadNetworkId || inspection.roadNetworkId || ''],
+                        ['Road Name', road?.roadName || road?.name || inspection.roadName || 'Not specified'],
+                      ].map(([label, value]) => (
+                        <div key={label}><span className="mb-2 block text-sm font-medium text-gray-700">{label}</span><span className="block min-h-[3rem] whitespace-pre-wrap rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">{value}</span></div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {inspectionHistoryFor(inspection).map((inspection) => {
+                    const score = Math.round(getRatingScore(inspection.conditionRating) * 10);
+                    const details = Object.entries(inspection.conditionRatings || {}).filter(([, value]) => value !== 'N/A');
+                    const defects = details.filter(([, value]) => value === 'Fair' || value === 'Poor' || value === 'Bad');
+                    const condition = isPendingInspectionRecord(inspection) ? 'Pending' : getConditionLabel(inspection);
+                    return <Fragment key={inspection.id}>
+                  <section className="border-b pb-6">
+                    <h3 className="mb-4 text-lg font-semibold text-gray-900">{`Inspection Details${inspection.annualFollowUpYear ? ` · Annual Follow-up ${inspection.annualFollowUpYear}` : ''}`}</h3>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      {[
+                        ['Inspector', inspection.inspector || ''],
+                        ['Inspection Type', isPendingInspectionRecord(inspection) ? '' : inspection.inspectionType || ''],
+                        ['Integrity', `${score}%`],
+                        ['Condition', condition],
+                        ['Inspection Date', isPendingInspectionRecord(inspection) ? '' : inspection.date || ''],
+                        ...(!inspection.isAnnualFollowUp && !inspection.isScheduledAnnualFollowUp ? [['Validation Status', isPendingInspectionRecord(inspection) ? 'Pending' : inspection.validationStatus || 'Pending Validation']] : []),
+                      ].map(([label, value]) => (
+                        <div key={label}><span className="mb-2 block text-sm font-medium text-gray-700">{label}</span><span className="block min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">{value}</span></div>
+                      ))}
+                    </div>
+                    <p className="mb-2 mt-4 block text-sm font-medium text-gray-700">Observation Notes</p>
+                    <p className="min-h-[5rem] whitespace-pre-wrap rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm leading-6 text-gray-700">
+                      {isPendingInspectionRecord(inspection) ? '' : findingsSummary(inspection.conditionRatings || {}, inspection.conditionRemarks || {}) || inspection.remarks || ''}
+                    </p>
+                  </section>
+                  {(road?.projectDescription || road?.description || inspection.projectDescription || inspection.roadNetworkId || road?.roadNetworkId) && (
+                    <section>
+                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Project Details</h3>
+                      <div className="space-y-3 rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">
+                        {(road?.projectDescription || road?.description || inspection.projectDescription) && (
+                          <p><span className="font-semibold text-slate-700">Scope: </span>{road?.projectDescription || road?.description || inspection.projectDescription}</p>
+                        )}
+                        {(road?.roadNetworkId || inspection.roadNetworkId) && (
+                          <p><span className="font-semibold text-slate-700">Road Network ID: </span>{road?.roadNetworkId || inspection.roadNetworkId}</p>
+                        )}
+                      </div>
+                    </section>
+                  )}
+
+                  <section>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Local Road Condition Assessment</h3>
+                    {details.length > 0 ? (
+                      <div className="space-y-2">
+                        {inspectionCategories.map(({ label, details: descriptors }) => {
+                          const storedRating = inspection.conditionRatings?.[label];
+                          const rating = storedRating && storedRating !== 'N/A' ? storedRating : '';
+                          const remark = inspection.conditionRemarks?.[label] || '';
+                          const files = inspection.conditionAttachments?.[label] ?? [];
+                          return (
+                            <div
+                              key={label}
+                              data-category={label}
+                              className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="font-medium text-slate-700">{label}</span>
+                                {rating ? (
+                                  <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-semibold ${
+                                    rating === 'Good' ? 'bg-emerald-50 text-emerald-700' :
+                                    rating === 'Fair' ? 'bg-amber-50 text-amber-700' :
+                                    rating === 'N/A' ? 'bg-slate-200 text-slate-600' :
+                                    'bg-rose-50 text-rose-700'
+                                  }`}>{rating}</span>
+                                ) : (
+                                  <span className="shrink-0 text-xs italic text-slate-500">
+                                    {storedRating === 'N/A' ? 'N/A' : 'Not assessed'}
+                                  </span>
+                                )}
+                              </div>
+                              {rating ? (
+                                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                  {descriptors[rating as ConditionRating]}
+                                </p>
+                              ) : null}
+                              {remark ? (
+                                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                                  <span className="font-semibold">Remarks: </span>{remark}
+                                </p>
+                              ) : null}
+                              {files.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-2">
+                                  {files.map((file, index) => (
+                                    <button
+                                      key={`${file.name}-${index}`}
+                                      type="button"
+                                      onClick={() => setSelectedInspectionAttachment(file as Inspection['attachment'])}
+                                      className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
+                                    >
+                                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                                      <span className="max-w-[14rem] truncate">{file.name}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-sm text-gray-500">
+                        No condition details recorded.
+                      </p>
+                    )}
+                  </section>
+
+                  <section>
+                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Defects &amp; Maintenance Requisitions</h3>
+                    {defects.length > 0 ? (
+                      <ul className="space-y-1.5">
+                        {defects.map(([element, rating]) => (
+                          <li key={element} className="flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-600">
+                            <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                            <span>{element}{details.length > 1 ? ` · ${rating}` : ''}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-sm text-gray-500">
+                        {details.length > 0 ? 'No defects identified.' : 'No condition details recorded.'}
+                      </p>
+                    )}
+                  </section>
+                    </Fragment>;
+                  })}
+                  {canPrint && (
+                    <div className="flex justify-end border-t border-slate-200 pt-5">
+                      <button type="button" onClick={() => printInspection(inspection, referenceId)} className="inline-flex items-center gap-2 rounded-md bg-blue-700 px-5 py-2 text-sm font-medium text-white hover:bg-blue-800">
+                        <Printer className="h-4 w-4" /> Print
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            );
+          })()}
+        </Dialog>
+
+        <Dialog open={selectedInspectionAttachment !== null} onOpenChange={(open) => !open && setSelectedInspectionAttachment(null)}>
+          {selectedInspectionAttachment && (
+            <DialogContent className="max-h-[min(760px,calc(100vh-32px))] overflow-hidden rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl sm:max-w-[900px]">
+              <div className="bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-4 pr-12 text-white">
+                <DialogTitle className="truncate text-base font-bold text-white">{selectedInspectionAttachment.name}</DialogTitle>
+                <DialogDescription className="mt-1 text-xs text-blue-100">{selectedInspectionAttachment.type || 'File'}</DialogDescription>
+              </div>
+              <div className="flex max-h-[calc(min(760px,100vh-32px)-84px)] min-h-[320px] items-center justify-center overflow-auto bg-slate-100 p-6">
+                {selectedInspectionAttachment.type.startsWith('image/') ? (
+                  <img
+                    src={selectedInspectionAttachment.dataUrl}
+                    alt={selectedInspectionAttachment.name}
+                    className="max-h-[min(620px,calc(100vh-160px))] max-w-full object-contain"
+                  />
+                ) : (
+                  <iframe
+                    src={selectedInspectionAttachment.dataUrl}
+                    title={selectedInspectionAttachment.name}
+                    className="h-[min(620px,calc(100vh-160px))] w-full rounded-lg border border-slate-200 bg-white"
+                  />
+                )}
+              </div>
+            </DialogContent>
+          )}
+        </Dialog>
+
+  </>;
+
   return (
     <>
     {printSections && (
@@ -667,10 +872,12 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
         sections={printSections}
         onComplete={() => {
           setPrintSections(null);
+          onDetailClose?.();
         }}
       />
     )}
-    <div className="inspection-results flex min-h-screen flex-col bg-[#E3EEF9] p-6 text-slate-800 sm:px-7">
+    {inspectionDialogs}
+    {!detailInspectionId && <div className="inspection-results flex min-h-screen flex-col bg-[#E3EEF9] p-6 text-slate-800">
       <div className="flex w-full flex-1 flex-col">
         <div className="mb-9 flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -1105,215 +1312,6 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
           </div>
         )}
 
-        <Dialog
-          open={selectedInspection !== null}
-          onOpenChange={(open) => {
-            if (!open) setSelectedInspection(null);
-          }}
-        >
-          {selectedInspection && (() => {
-            const { inspection, referenceId } = selectedInspection;
-            const road = localRoadList.find((item) => item.id === inspection.localRoadId);
-            const projectName = road?.projectName || road?.name || inspection.projectName || inspection.localRoadName;
-
-            return (
-              <DialogContent className="inspection-detail-dialog card-details-dialog max-h-[min(620px,calc(100vh-32px))] overflow-hidden rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl sm:max-w-[840px]">
-                <div className="bg-gradient-to-r from-blue-700 to-blue-600 px-6 py-3 pr-14 text-white">
-                  <DialogTitle className="text-xl font-bold text-white">{projectName}</DialogTitle>
-                  <DialogDescription className="text-sm text-blue-100">Municipal Engineering Office · Inspection Entry · {referenceId}</DialogDescription>
-                </div>
-                <div className="max-h-[calc(min(620px,100vh-32px)-76px)] space-y-5 overflow-y-auto px-6 pb-8 pt-5">
-                  <section className="border-b pb-6">
-                    <h3 className="mb-4 text-lg font-semibold text-gray-900">Project Information</h3>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {[
-                      { label: 'Project / Program / Activity Name', value: projectName },
-                      { label: 'Project Category', value: road?.projectCategory || road?.type || inspection.projectCategory || 'Local Road' },
-                      { label: 'Location', value: road?.location || inspection.location || '', fullWidth: true },
-                    ].map(({ label, value, fullWidth }) => (
-                      <div key={label} className={fullWidth ? 'md:col-span-2' : undefined}>
-                        <span className="mb-2 block text-sm font-medium text-gray-700">{label}</span>
-                        <span className="block min-h-[3rem] whitespace-pre-wrap rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                  </section>
-
-                  <section className="border-b pb-6">
-                    <h3 className="mb-4 text-lg font-semibold text-gray-900">Road Information</h3>
-                    <div className="space-y-4">
-                      {[
-                        ['Road Network ID No.', road?.roadNetworkId || inspection.roadNetworkId || ''],
-                        ['Road Name', road?.roadName || road?.name || inspection.roadName || 'Not specified'],
-                      ].map(([label, value]) => (
-                        <div key={label}><span className="mb-2 block text-sm font-medium text-gray-700">{label}</span><span className="block min-h-[3rem] whitespace-pre-wrap rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">{value}</span></div>
-                      ))}
-                    </div>
-                  </section>
-
-                  {inspectionHistoryFor(inspection).map((inspection) => {
-                    const score = Math.round(getRatingScore(inspection.conditionRating) * 10);
-                    const details = Object.entries(inspection.conditionRatings || {}).filter(([, value]) => value !== 'N/A');
-                    const defects = details.filter(([, value]) => value === 'Fair' || value === 'Poor' || value === 'Bad');
-                    const condition = isPendingInspectionRecord(inspection) ? 'Pending' : getConditionLabel(inspection);
-                    return <Fragment key={inspection.id}>
-                  <section className="border-b pb-6">
-                    <h3 className="mb-4 text-lg font-semibold text-gray-900">{`Inspection Details${inspection.annualFollowUpYear ? ` · Annual Follow-up ${inspection.annualFollowUpYear}` : ''}`}</h3>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      {[
-                        ['Inspector', inspection.inspector || ''],
-                        ['Inspection Type', isPendingInspectionRecord(inspection) ? '' : inspection.inspectionType || ''],
-                        ['Integrity', `${score}%`],
-                        ['Condition', condition],
-                        ['Inspection Date', isPendingInspectionRecord(inspection) ? '' : inspection.date || ''],
-                        ...(!inspection.isAnnualFollowUp && !inspection.isScheduledAnnualFollowUp ? [['Validation Status', isPendingInspectionRecord(inspection) ? 'Pending' : inspection.validationStatus || 'Pending Validation']] : []),
-                      ].map(([label, value]) => (
-                        <div key={label}><span className="mb-2 block text-sm font-medium text-gray-700">{label}</span><span className="block min-h-[3rem] rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">{value}</span></div>
-                      ))}
-                    </div>
-                    <p className="mb-2 mt-4 block text-sm font-medium text-gray-700">Observation Notes</p>
-                    <p className="min-h-[5rem] whitespace-pre-wrap rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm leading-6 text-gray-700">
-                      {isPendingInspectionRecord(inspection) ? '' : findingsSummary(inspection.conditionRatings || {}, inspection.conditionRemarks || {}) || inspection.remarks || ''}
-                    </p>
-                  </section>
-                  {(road?.projectDescription || road?.description || inspection.projectDescription || inspection.roadNetworkId || road?.roadNetworkId) && (
-                    <section>
-                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Project Details</h3>
-                      <div className="space-y-3 rounded-lg border border-gray-300 bg-gray-100 px-4 py-3 text-sm text-gray-700">
-                        {(road?.projectDescription || road?.description || inspection.projectDescription) && (
-                          <p><span className="font-semibold text-slate-700">Scope: </span>{road?.projectDescription || road?.description || inspection.projectDescription}</p>
-                        )}
-                        {(road?.roadNetworkId || inspection.roadNetworkId) && (
-                          <p><span className="font-semibold text-slate-700">Road Network ID: </span>{road?.roadNetworkId || inspection.roadNetworkId}</p>
-                        )}
-                      </div>
-                    </section>
-                  )}
-
-                  <section>
-                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Local Road Condition Assessment</h3>
-                    {details.length > 0 ? (
-                      <div className="space-y-2">
-                        {inspectionCategories.map(({ label, details: descriptors }) => {
-                          const storedRating = inspection.conditionRatings?.[label];
-                          const rating = storedRating && storedRating !== 'N/A' ? storedRating : '';
-                          const remark = inspection.conditionRemarks?.[label] || '';
-                          const files = inspection.conditionAttachments?.[label] ?? [];
-                          return (
-                            <div
-                              key={label}
-                              data-category={label}
-                              className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="font-medium text-slate-700">{label}</span>
-                                {rating ? (
-                                  <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-semibold ${
-                                    rating === 'Good' ? 'bg-emerald-50 text-emerald-700' :
-                                    rating === 'Fair' ? 'bg-amber-50 text-amber-700' :
-                                    rating === 'N/A' ? 'bg-slate-200 text-slate-600' :
-                                    'bg-rose-50 text-rose-700'
-                                  }`}>{rating}</span>
-                                ) : (
-                                  <span className="shrink-0 text-xs italic text-slate-500">
-                                    {storedRating === 'N/A' ? 'N/A' : 'Not assessed'}
-                                  </span>
-                                )}
-                              </div>
-                              {rating ? (
-                                <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                                  {descriptors[rating as ConditionRating]}
-                                </p>
-                              ) : null}
-                              {remark ? (
-                                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
-                                  <span className="font-semibold">Remarks: </span>{remark}
-                                </p>
-                              ) : null}
-                              {files.length > 0 && (
-                                <div className="mt-1 flex flex-wrap gap-2">
-                                  {files.map((file, index) => (
-                                    <button
-                                      key={`${file.name}-${index}`}
-                                      type="button"
-                                      onClick={() => setSelectedInspectionAttachment(file as Inspection['attachment'])}
-                                      className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2 py-1 text-xs text-blue-700 hover:bg-blue-50"
-                                    >
-                                      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-                                      <span className="max-w-[14rem] truncate">{file.name}</span>
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-sm text-gray-500">
-                        No condition details recorded.
-                      </p>
-                    )}
-                  </section>
-
-                  <section>
-                    <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Defects &amp; Maintenance Requisitions</h3>
-                    {defects.length > 0 ? (
-                      <ul className="space-y-1.5">
-                        {defects.map(([element, rating]) => (
-                          <li key={element} className="flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm text-gray-600">
-                            <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-                            <span>{element}{details.length > 1 ? ` · ${rating}` : ''}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-3 text-sm text-gray-500">
-                        {details.length > 0 ? 'No defects identified.' : 'No condition details recorded.'}
-                      </p>
-                    )}
-                  </section>
-                    </Fragment>;
-                  })}
-                  {canPrint && (
-                    <div className="flex justify-end border-t border-slate-200 pt-5">
-                      <button type="button" onClick={() => printInspection(inspection, referenceId)} className="inline-flex items-center gap-2 rounded-md bg-blue-700 px-5 py-2 text-sm font-medium text-white hover:bg-blue-800">
-                        <Printer className="h-4 w-4" /> Print
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </DialogContent>
-            );
-          })()}
-        </Dialog>
-
-        <Dialog open={selectedInspectionAttachment !== null} onOpenChange={(open) => !open && setSelectedInspectionAttachment(null)}>
-          {selectedInspectionAttachment && (
-            <DialogContent className="max-h-[min(760px,calc(100vh-32px))] overflow-hidden rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl sm:max-w-[900px]">
-              <div className="bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-4 pr-12 text-white">
-                <DialogTitle className="truncate text-base font-bold text-white">{selectedInspectionAttachment.name}</DialogTitle>
-                <DialogDescription className="mt-1 text-xs text-blue-100">{selectedInspectionAttachment.type || 'File'}</DialogDescription>
-              </div>
-              <div className="flex max-h-[calc(min(760px,100vh-32px)-84px)] min-h-[320px] items-center justify-center overflow-auto bg-slate-100 p-6">
-                {selectedInspectionAttachment.type.startsWith('image/') ? (
-                  <img
-                    src={selectedInspectionAttachment.dataUrl}
-                    alt={selectedInspectionAttachment.name}
-                    className="max-h-[min(620px,calc(100vh-160px))] max-w-full object-contain"
-                  />
-                ) : (
-                  <iframe
-                    src={selectedInspectionAttachment.dataUrl}
-                    title={selectedInspectionAttachment.name}
-                    className="h-[min(620px,calc(100vh-160px))] w-full rounded-lg border border-slate-200 bg-white"
-                  />
-                )}
-              </div>
-            </DialogContent>
-          )}
-        </Dialog>
-
         <div className="mb-8 flex flex-col items-stretch justify-between gap-4 rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
           <label className="relative block w-full min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -1469,7 +1467,7 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
           setPendingDelete(null);
         }}
       />
-    </div>
+    </div>}
     </>
   );
 }

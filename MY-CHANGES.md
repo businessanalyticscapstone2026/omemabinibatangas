@@ -78,6 +78,69 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-28 — [mine] Align final pavement legend row
+- **Type:** Modified
+- **Files:** `src/app/components/AnalyticsDashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Use the full width for the last three road element labels.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-28 — [mine] Arrange pavement legend in four columns
+- **Type:** Modified
+- **Files:** `src/app/components/AnalyticsDashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Show the eleven pavement and road-element labels in rows of four, four, and three.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-28 — [mine] Refine analytics charts and inspection spacing
+- **Type:** Modified
+- **Files:** `src/app/components/AnalyticsDashboard.tsx` (modified), `src/app/components/InspectionModule.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Align chart legends, summaries, navigation, and module spacing with the requested dashboard layout.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-28 — [mine] Expand analytics road element chart and align spacing
+- **Type:** Modified
+- **Files:** `src/app/components/AnalyticsDashboard.tsx` (modified), `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Show all eleven assessed road elements, consistent chart legends, and matching module margins.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-28 — [mine] Reorder analytics inspection panels
+- **Type:** Modified
+- **Files:** `src/app/components/AnalyticsDashboard.tsx` (modified), `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Place the monthly trend and recent inspections below the pavement and maintenance charts.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-28 — [mine] Show inspection trend and recent inspections in analytics
+- **Type:** Modified
+- **Files:** `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Include both existing inspection panels on the analytics page.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-28 — [mine] Add road and maintenance charts to analytics
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/components/AnalyticsDashboard.tsx` (modified), `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Show dashboard road metrics alongside pavement type and maintenance status distributions.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-28 — [mine] Move welcome message to dashboard heading
+- **Type:** Modified
+- **Files:** `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Show the signed-in user's name as the dashboard heading and restore the overview description beneath it.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
+### 2026-11-28 — [mine] Personalize dashboard overview and clear analytics
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/components/AnalyticsDashboard.tsx` (modified), `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (new)
+- **What & why:** Show each signed-in user's registered name and remove the requested analytics cards and inventory.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-23 — [mine] Remove automated validation window text from email
 - **Type:** Modified
 - **Files:** `src/app/api/validation-reminders/route.ts` (modified), `src/lib/supabase-data.ts` (modified), `tests/automatic-validation-email.test.cjs` (modified)
@@ -932,3 +995,33 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 - Inspector inspection management uses a date filter instead of status tabs and no longer offers Add Inspection. The editable form offers the single Monitoring and Maintenance Inspection type and removes the final general attachment field while keeping per-category and previously saved attachments.
 - Added nullable `inspections.inspection_purpose` to store the selected type independently of the annual follow-up enum. The additive migration was applied to shared Supabase with explicit owner approval; no existing records were removed or modified.
+
+### Validation-gated assignment and role dashboards
+- Require an annual validated decision before assigning inspectors, including historical projects; retain access for an earlier validated follow-up when a later year is pending.
+- Replace Dashboard-only charts with role-specific assignment, validation, inspection and maintenance charts with live breakdowns and role-appropriate navigation; retain the separate Analytics charts and dashboard KPIs.
+- Limit inspector dashboard data to currently assigned projects and keep scheduled maintenance results out of the maintenance-needed chart.
+- Added role aggregation and assignment regression tests. TypeScript and production build passed; focused tests passed. The full suite reported two unrelated AI generation timing test failures.
+
+### Dashboard chart presentation
+- Display empty chart axes or grey donut rings instead of replacing charts with empty-state messages, including Analytics charts.
+- Show completed percentages in inspection and maintenance donuts, match validation colors to badge states, align Dashboard bar styling with Analytics, and update requested subtitles.
+- Dashboard and Analytics tests, TypeScript, and production build passed.
+
+### AI recommendation cards and inspection details
+- Replace the recommendation table with keyboard-accessible project cards showing category, barangay, inspection date, condition, affected components and AI output; add the requested module subtitle.
+- Open the card's corresponding inspection in a dialog with assessment ratings, remarks and attachment previews while preserving automatic recommendation generation.
+- Added card and inspection-dialog interaction tests. TypeScript and production build passed; full suite: 235 passed and the same two pre-existing AI generation timing tests failed.
+
+### Shared inspection details in AI recommendations
+- Open the existing Inspection Management detail dialog directly from AI recommendation cards, sharing its condition badge colors, fields, annual history, attachment previews and permitted print action.
+- Verify the AI and Inspection Management dialog markup matches; inspection-category tests, TypeScript and production build passed.
+
+### Maintenance donut overall condition
+- Group unscheduled inspection results with Fair/Poor/Bad component issues by the same overall condition shown in Inspection Details, using a shared scoring helper.
+- Preserve the component-based eligibility and scheduled-record exclusion; include Good or Pending Validation when that is the overall displayed condition, rather than mislabeling it as the worst component.
+- Dashboard and inspection tests, TypeScript, and production build passed.
+
+### Maintenance donut excludes Good overall conditions
+- Restrict the maintenance donut to unscheduled completed inspection results whose overall displayed condition is Fair, Poor or Bad; do not use component ratings to decide inclusion.
+- Good and unscored results are excluded even when an element is unsatisfactory. Inspection Details currently maps all positive scores below 5 to Poor, so it does not presently produce an overall Bad label.
+- Dashboard and inspection tests and TypeScript passed.

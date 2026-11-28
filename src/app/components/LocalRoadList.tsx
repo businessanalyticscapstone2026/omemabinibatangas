@@ -111,9 +111,9 @@ function InspectorAssignmentSelect({ item, inspectors, listState, refresh, onAss
   };
   const assignedInspector = inspectors.find(inspector => inspector.id === item.inspectorId);
   const available = !item.inspectorId || Boolean(assignedInspector);
-  const displayValue = item.inspectorId
+  const displayValue = !canAssignInspector(item) ? 'Awaiting Validation' : item.inspectorId
     ? assignedInspector?.name ?? (listState === 'ready' ? 'Inspector unavailable' : 'Inspector')
-    : (canAssignInspector(item) ? 'Not Assigned' : 'Awaiting Validation');
+    : 'Not Assigned';
   return <>
     <StyledFilterSelect
       label={`Assign inspector for ${item.projectName || item.name}`}
