@@ -17,6 +17,7 @@ import { AlertTriangle, CheckCircle2, Clock3, Route, ArrowUpRight, Activity } fr
 interface DashboardProps {
   localRoadData: any[];
   inspections: any[];
+  userName: string;
   onTabChange: (tab: string) => void;
 }
 
@@ -28,7 +29,7 @@ const conditionColors: Record<string, string> = {
 
 const isRoad = (item: any) => /road/i.test(`${item.type || ''} ${item.projectCategory || ''}`);
 
-export function Dashboard({ localRoadData, inspections, onTabChange }: DashboardProps) {
+export function Dashboard({ localRoadData, inspections, userName, onTabChange }: DashboardProps) {
   const roads = localRoadData.filter(isRoad);
   const roadIds = new Set(roads.map(road => road.id));
   const roadInspections = inspections.filter(inspection => roadIds.has(inspection.localRoadId));
@@ -143,10 +144,8 @@ export function Dashboard({ localRoadData, inspections, onTabChange }: Dashboard
   return (
     <main className="min-h-screen bg-[#E3EEF9] p-4 text-slate-800 sm:p-5">
       <header className="mb-6">
-        <h1 className="text-xl font-semibold tracking-tight text-blue-700">Road Monitoring Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Real-time pavement condition, road network classifications, and field audit status for Mabini, Batangas.
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight text-blue-700">Dashboard Overview</h1>
+        <p className="mt-1 text-sm text-slate-500">Welcome, {userName || 'User'}</p>
       </header>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
         {summaryCards.map(({ label, value, note, icon: Icon, color, onClick }) => {

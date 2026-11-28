@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-28 — [mine] Personalize dashboard overview and clear analytics
+- **Type:** Modified
+- **Files:** `src/app/App.tsx` (modified), `src/app/components/AnalyticsDashboard.tsx` (modified), `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (new)
+- **What & why:** Show each signed-in user's registered name and remove the requested analytics cards and inventory.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-23 — [mine] Remove automated validation window text from email
 - **Type:** Modified
 - **Files:** `src/app/api/validation-reminders/route.ts` (modified), `src/lib/supabase-data.ts` (modified), `tests/automatic-validation-email.test.cjs` (modified)

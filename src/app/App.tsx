@@ -769,6 +769,7 @@ export default function App() {
                 <Dashboard
                   localRoadData={localRoadData}
                   inspections={inspections}
+                  userName={userName}
                   onTabChange={setActiveTab}
                 />
               )}
@@ -824,9 +825,7 @@ export default function App() {
                 </div>
               )}
               {activeTab === 'analytics' && hasAccess('analytics') && (
-                <AnalyticsDashboard
-                  localRoadData={localRoadData}
-                />
+                <AnalyticsDashboard />
               )}
               {activeTab === 'validation-management' && hasAccess('validation-management') && (
                 <LocalRoadList
