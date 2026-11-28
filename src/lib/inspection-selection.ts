@@ -10,26 +10,6 @@ export interface InspectionSummary {
   conditionRating?: number;
 }
 
-/** Match the overall condition displayed in Inspection Details. */
-export function inspectionRatingScore(rating: number | string | null | undefined): number {
-  const numericRating = Number(rating);
-  if (Number.isFinite(numericRating)) return numericRating;
-  const normalizedRating = String(rating).toLowerCase();
-  if (normalizedRating === 'good') return 9;
-  if (normalizedRating === 'fair') return 7;
-  if (normalizedRating === 'poor') return 4;
-  if (normalizedRating === 'bad') return 2;
-  return 0;
-}
-
-export function inspectionConditionLabel(rating: number | string | null | undefined): 'Good' | 'Fair' | 'Poor' | 'Pending Validation' {
-  const score = inspectionRatingScore(rating);
-  if (score >= 8) return 'Good';
-  if (score >= 5) return 'Fair';
-  if (score > 0) return 'Poor';
-  return 'Pending Validation';
-}
-
 export function isPendingInspection(inspection: InspectionSummary): boolean {
   return inspection.isScheduledAnnualFollowUp === true || inspection.isPendingValidationInspection === true ||
     (inspection.isValidationInspection === true && inspection.isPendingValidationInspection !== false);

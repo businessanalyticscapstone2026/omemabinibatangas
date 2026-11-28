@@ -27,8 +27,8 @@ const projects = [
 ];
 const inspections = [
   { id: 'b-pending', localRoadId: 'b', date: '2026-01-01', annualFollowUpYear: 2026, isScheduledAnnualFollowUp: true },
-  { id: 'b-old', localRoadId: 'b', inspectorId: 'i1', date: '2025-01-01', annualFollowUpYear: 2025, conditionRating: 6, conditionRatings: { Concrete: 'Fair', Asphalt: 'Good' } },
-  { id: 'c-done', localRoadId: 'c', inspectorId: 'i2', date: '2026-01-01', conditionRating: 2, conditionRatings: { Concrete: 'Bad' } },
+  { id: 'b-old', localRoadId: 'b', inspectorId: 'i1', date: '2025-01-01', annualFollowUpYear: 2025, conditionRatings: { Concrete: 'Fair', Asphalt: 'Good' } },
+  { id: 'c-done', localRoadId: 'c', inspectorId: 'i2', date: '2026-01-01', conditionRatings: { Concrete: 'Bad' } },
   { id: 'a-good', localRoadId: 'a', date: '2025-01-01', conditionRatings: { Concrete: 'Good' } },
 ];
 const calc = (role, userId = '') => metrics.dashboardMetrics(projects, inspections, [], [], [], role, userId);
@@ -40,27 +40,12 @@ test('assignment and revision graphs follow validation and update when assigned'
   assert.deepEqual(metrics.dashboardMetrics(projects.map(p => p.id === 'a' ? { ...p, inspectorId: 'i1' } : p), inspections, [], [], [], 'Head Engineer', '').pendingAssignments, []);
 });
 test('maintenance graph counts actionable unscheduled results, excludes good and scheduled', () => {
-  assert.deepEqual(calc('Head Engineer').maintenanceNeeded.map(item => item.value), [0, 1, 1, 0]);
+  assert.deepEqual(calc('Head Engineer').maintenanceNeeded.map(item => item.value), [1, 0, 1]);
   const result = metrics.dashboardMetrics(projects, inspections, [{ inspectionId: 'b-old', status: 'Scheduled' }], [], [], 'Staff - Encoder', '');
-  assert.deepEqual(result.maintenanceNeeded.map(item => item.value), [0, 0, 1, 0]);
+  assert.deepEqual(result.maintenanceNeeded.map(item => item.value), [0, 0, 1]);
   assert.deepEqual(result.maintenanceStatus.map(item => item.value), [1, 0, 0, 0]);
   const archived = metrics.dashboardMetrics(projects, inspections, [], ['c-done'], [], 'Staff - Encoder', '');
-  assert.deepEqual(archived.maintenanceNeeded.map(item => item.value), [0, 1, 0, 0]);
-});
-
-test('maintenance chart groups by the inspection details overall condition, not the worst component', () => {
-  const assessed = [
-    { id: 'fair', localRoadId: 'a', conditionRating: 7, conditionRatings: { Drainage: 'Bad', Concrete: 'Good' } },
-    { id: 'good', localRoadId: 'b', conditionRating: 9, conditionRatings: { Drainage: 'Fair', Concrete: 'Good' } },
-    { id: 'poor', localRoadId: 'c', conditionRating: 2, conditionRatings: { Concrete: 'Bad' } },
-    { id: 'unknown', localRoadId: 'd', conditionRating: 0, conditionRatings: { Concrete: 'Fair' } },
-    { id: 'no-issues', localRoadId: 'a', conditionRating: 9, conditionRatings: { Concrete: 'Good' } },
-    { id: 'pending', localRoadId: 'a', isScheduledAnnualFollowUp: true, conditionRating: 5, conditionRatings: { Concrete: 'Fair' } },
-  ];
-  const result = metrics.dashboardMetrics(projects, assessed, [], ['poor'], [], 'Head Engineer', '');
-  assert.deepEqual(result.maintenanceNeeded.map(item => [item.name, item.value]), [['Good', 1], ['Fair', 1], ['Poor', 0], ['Pending Validation', 1]]);
-  assert.equal(selection.inspectionConditionLabel(7), 'Fair');
-  assert.equal(selection.inspectionConditionLabel(2), 'Poor');
+  assert.deepEqual(archived.maintenanceNeeded.map(item => item.value), [1, 0, 0]);
 });
 test('inspector dashboard only counts currently assigned projects and their results', () => {
   const mine = calc('Staff - Inspector', 'i1');
