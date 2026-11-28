@@ -82,11 +82,12 @@ export function AnalyticsDashboard({ localRoadData, inspections, maintenanceReco
         <h1 className="text-xl font-semibold tracking-tight text-blue-700">Road Network Analytics</h1>
         <p className="mt-1 text-sm text-slate-500">Real-time pavement condition, road network classifications, and field audit status for Mabini, Batangas.</p>
       </header>
-      <Dashboard analyticsSummary localRoadData={localRoadData} inspections={inspections} userName="" onTabChange={onTabChange} />
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
-        <DistributionChart title="Pavement Type Ratio" description={`${identified} road projects with identified concrete or asphalt details; ${pavement.Unspecified} unspecified or other.`} data={pavementData} emptyMessage="No concrete or asphalt pavement details recorded." />
-        <DistributionChart title="Maintenance Status Distribution" description="Distribution of recorded maintenance activities by status." data={maintenanceData} emptyMessage="No maintenance records available." />
-      </div>
+      <Dashboard analyticsSummary localRoadData={localRoadData} inspections={inspections} userName="" onTabChange={onTabChange} afterRoadCharts={
+        <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <DistributionChart title="Pavement Type Ratio" description={`${identified} road projects with identified concrete or asphalt details; ${pavement.Unspecified} unspecified or other.`} data={pavementData} emptyMessage="No concrete or asphalt pavement details recorded." />
+          <DistributionChart title="Maintenance Status Distribution" description="Distribution of recorded maintenance activities by status." data={maintenanceData} emptyMessage="No maintenance records available." />
+        </div>
+      } />
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   BarChart,
   Bar,
@@ -19,6 +20,7 @@ interface DashboardProps {
   inspections: any[];
   userName: string;
   analyticsSummary?: boolean;
+  afterRoadCharts?: ReactNode;
   onTabChange: (tab: string) => void;
 }
 
@@ -30,7 +32,7 @@ const conditionColors: Record<string, string> = {
 
 const isRoad = (item: any) => /road/i.test(`${item.type || ''} ${item.projectCategory || ''}`);
 
-export function Dashboard({ localRoadData, inspections, userName, onTabChange, analyticsSummary = false }: DashboardProps) {
+export function Dashboard({ localRoadData, inspections, userName, onTabChange, analyticsSummary = false, afterRoadCharts }: DashboardProps) {
   const roads = localRoadData.filter(isRoad);
   const roadIds = new Set(roads.map(road => road.id));
   const roadInspections = inspections.filter(inspection => roadIds.has(inspection.localRoadId));
@@ -249,6 +251,7 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange, a
         </section>
       </div>
 
+      {afterRoadCharts}
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
         <section className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-md">
           <div className="flex items-start justify-between border-b border-slate-100 pb-3">

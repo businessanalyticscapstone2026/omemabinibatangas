@@ -39,6 +39,9 @@ test('analytics displays dashboard summaries and requested distributions', () =>
   for (const label of ['Total Road Network', 'High Risk Road Sections', 'Good Pavement State', 'Recent Road Audits', 'Roads by Category', 'Pavement Condition Distribution', 'Pavement Type Ratio', 'Maintenance Status Distribution', 'Monthly Road Inspection Trend', 'Recent Road Field Inspections']) assert.ok(html.includes(label), label);
   for (const removed of ['Total Road Project Investment', 'Barangays Covered', 'Barangay Road Classification']) assert.ok(!html.includes(removed), removed);
   assert.ok(html.includes('No maintenance records available.'));
+  assert.ok(html.indexOf('Pavement Condition Distribution') < html.indexOf('Pavement Type Ratio'));
+  assert.ok(html.indexOf('Maintenance Status Distribution') < html.indexOf('Monthly Road Inspection Trend'));
+  assert.ok(html.indexOf('Maintenance Status Distribution') < html.indexOf('Recent Road Field Inspections'));
 });
 
 test('pavement counts do not double-count mixed materials or include non-road projects', () => {

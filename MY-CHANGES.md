@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-28 — [mine] Reorder analytics inspection panels
+- **Type:** Modified
+- **Files:** `src/app/components/AnalyticsDashboard.tsx` (modified), `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Place the monthly trend and recent inspections below the pavement and maintenance charts.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-28 — [mine] Show inspection trend and recent inspections in analytics
 - **Type:** Modified
 - **Files:** `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
