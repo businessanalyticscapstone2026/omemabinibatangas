@@ -829,6 +829,8 @@ export default function App() {
                     inspections={inspections}
                     predictions={aiRecommendations}
                     recommendationsLoaded={aiRecommendationsLoaded}
+                    currentUser={userName}
+                    userRole={userRole}
                     onPredictionsChange={handleAiRecommendationsChange}
                   />
                 </div>

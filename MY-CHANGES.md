@@ -1011,3 +1011,7 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 - Replace the recommendation table with keyboard-accessible project cards showing category, barangay, inspection date, condition, affected components and AI output; add the requested module subtitle.
 - Open the card's corresponding inspection in a dialog with assessment ratings, remarks and attachment previews while preserving automatic recommendation generation.
 - Added card and inspection-dialog interaction tests. TypeScript and production build passed; full suite: 235 passed and the same two pre-existing AI generation timing tests failed.
+
+### Shared inspection details in AI recommendations
+- Open the existing Inspection Management detail dialog directly from AI recommendation cards, sharing its condition badge colors, fields, annual history, attachment previews and permitted print action.
+- Verify the AI and Inspection Management dialog markup matches; inspection-category tests, TypeScript and production build passed.

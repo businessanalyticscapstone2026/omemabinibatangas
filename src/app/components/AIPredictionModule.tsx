@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sparkles, Loader2, CheckCircle, CalendarDays, MapPin } from 'lucide-react';
 import { findingsSummary } from '@/lib/inspection-selection';
-import { InspectionResultDialog } from './InspectionResultDialog';
+import { InspectionModule } from './InspectionModule';
 
 export interface PredictionResult {
   localRoadId: string;
@@ -22,6 +22,8 @@ interface AIPredictionModuleProps {
   predictions: PredictionResult[];
   onPredictionsChange: (predictions: PredictionResult[]) => void;
   recommendationsLoaded?: boolean;
+  currentUser?: string;
+  userRole?: string;
 }
 
 const actionableRatings = new Set(['Fair', 'Poor', 'Bad']);
@@ -43,6 +45,8 @@ export function AIPredictionModule({
   predictions,
   onPredictionsChange,
   recommendationsLoaded = true,
+  currentUser = '',
+  userRole = '',
 }: AIPredictionModuleProps) {
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -228,7 +232,18 @@ export function AIPredictionModule({
             })}
             {rows.length === 0 && <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-600">No projects have a Fair, Poor, or Bad rating in their latest completed inspection. Projects rated only Good or N/A are not shown.</div>}
           </div>
-          <InspectionResultDialog inspection={rows.find(row => row.road.id === selectedProjectId)?.inspection || null} road={rows.find(row => row.road.id === selectedProjectId)?.road || null} onClose={() => setSelectedProjectId(null)} />
+          {rows.find(row => row.road.id === selectedProjectId)?.inspection?.id && <InspectionModule
+            key={selectedProjectId}
+            detailInspectionId={rows.find(row => row.road.id === selectedProjectId)!.inspection.id}
+            onDetailClose={() => setSelectedProjectId(null)}
+            inspections={inspections}
+            localRoadList={localRoadData}
+            currentUser={currentUser}
+            userRole={userRole}
+            onAddInspection={() => {}}
+            onEditInspection={async () => false}
+            onDeleteInspection={async () => false}
+          />}
 
           {/* Footer */}
           <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-500 text-center">

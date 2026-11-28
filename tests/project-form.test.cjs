@@ -24,14 +24,21 @@ function loadTs(relative, mocks = {}) {
 const inspectionSelection = loadTs('src/lib/inspection-selection.ts');
 const dialogMocks = {
   Dialog: ({ open, children }) => open ? React.createElement('div', { role: 'dialog' }, children) : null,
-  DialogContent: ({ children }) => React.createElement('div', null, children),
-  DialogTitle: ({ children }) => React.createElement('h2', null, children),
-  DialogDescription: ({ children }) => React.createElement('p', null, children),
+  DialogContent: ({ children, className }) => React.createElement('div', { className }, children),
+  DialogTitle: ({ children, className }) => React.createElement('h2', { className }, children),
+  DialogDescription: ({ children, className }) => React.createElement('p', { className }, children),
 };
-const inspectionResultDialog = loadTs('src/app/components/InspectionResultDialog.tsx', { './ui/dialog': dialogMocks, '@/lib/inspection-selection': inspectionSelection });
-const aiMocks = { '@/lib/inspection-selection': inspectionSelection, './InspectionResultDialog': inspectionResultDialog };
 const validation = loadTs('src/lib/project-form-validation.ts');
 const attachmentValidation = loadTs('src/lib/attachment-validation.ts');
+const passthroughUi = new Proxy({}, { get: () => ({ children }) => React.createElement(React.Fragment, null, children) });
+const inspectionModule = loadTs('src/app/components/InspectionModule.tsx', {
+  './ui/textarea': passthroughUi, './ui/dialog': dialogMocks, './ui/select': passthroughUi,
+  './ConfirmActionDialog': { ConfirmActionDialog: () => null }, './PrintDocument': { PrintDocument: () => null },
+  '@/lib/activity-log-client': { recordClientActivity: async () => {} }, '@/lib/inspection-selection': inspectionSelection,
+  '@/lib/project-form-validation': validation, '@/lib/attachment-validation': attachmentValidation,
+});
+const aiMocks = { '@/lib/inspection-selection': inspectionSelection, './InspectionModule': inspectionModule };
+
 let uploadCalls = [];
 let startDelay = () => Promise.resolve();
 global.fetch = async (url, options) => {
@@ -1086,8 +1093,17 @@ test('AI recommendation cards open the corresponding inspection details', async 
   assert.match(cards[0].textContent,/AI Justification/);assert.match(cards[0].textContent,/Recommended Maintenance Activity/);assert.match(cards[0].textContent,/Cracks/);assert.match(cards[0].textContent,/Repair/);
   await act(async()=>cards[0].click());
   const dialog=container.querySelector('[role=dialog]');assert.ok(dialog);assert.match(dialog.textContent,/Project Beta/);assert.match(dialog.textContent,/Juan/);assert.match(dialog.textContent,/Inspection Date/);assert.match(dialog.textContent,/Local Road Condition Assessment/);assert.match(dialog.textContent,/Cracks/);assert.match(dialog.textContent,/evidence.jpg/);
+  const concrete = dialog.querySelector('[data-category=Concrete]'); const drainage = dialog.querySelector('[data-category=Drainage]');
+  assert.ok(concrete.querySelector('.bg-amber-50.text-amber-700')); assert.ok(drainage.querySelector('.bg-rose-50.text-rose-700'));
+  assert.match(concrete.textContent, /Even with very minimal hair-line cracks/);
+  const sharedDetails = dialog.innerHTML;
   await act(async()=>[...dialog.querySelectorAll('button')].find(button=>button.textContent.includes('evidence.jpg')).click());
   assert.equal(container.querySelectorAll('[role=dialog]').length,2);assert.ok(container.querySelector('img[alt="evidence.jpg"]'));
+  await reset();
+  await act(async()=>root.render(React.createElement(inspectionModule.InspectionModule,{inspections,localRoadList:roads,userRole:'',currentUser:'',onAddInspection(){},onEditInspection:async()=>false,onDeleteInspection:async()=>false})));
+  const beta = [...container.querySelectorAll('[aria-label^="View full inspection"]')].find(item=>item.textContent.includes('Project Beta')); assert.ok(beta);
+  await act(async()=>beta.click());
+  assert.equal(container.querySelector('[role=dialog]').innerHTML, sharedDetails, 'AI and Inspection Management use the same detail view');
   await reset();
 });
 
