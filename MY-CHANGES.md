@@ -1015,3 +1015,8 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 ### Shared inspection details in AI recommendations
 - Open the existing Inspection Management detail dialog directly from AI recommendation cards, sharing its condition badge colors, fields, annual history, attachment previews and permitted print action.
 - Verify the AI and Inspection Management dialog markup matches; inspection-category tests, TypeScript and production build passed.
+
+### Maintenance donut overall condition
+- Group unscheduled inspection results with Fair/Poor/Bad component issues by the same overall condition shown in Inspection Details, using a shared scoring helper.
+- Preserve the component-based eligibility and scheduled-record exclusion; include Good or Pending Validation when that is the overall displayed condition, rather than mislabeling it as the worst component.
+- Dashboard and inspection tests, TypeScript, and production build passed.

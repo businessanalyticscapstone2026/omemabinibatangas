@@ -9,7 +9,7 @@ type Props = {
   userName: string; userRole: string; userId: string; onTabChange: (tab: string) => void;
 };
 type Chart = { title: string; description: string; data: DashboardSlice[]; type: 'bar' | 'donut'; unit: string; tab: string; centerCompleted?: boolean; palette?: Record<string, string> };
-const colors: Record<string, string> = { Pending: '#f59e0b', Completed: '#10b981', Returned: '#ef4444', Validated: '#2563eb', Scheduled: '#f59e0b', 'In Progress': '#2563eb', Deferred: '#94a3b8', Fair: '#60a5fa', Poor: '#f59e0b', Bad: '#ef4444' };
+const colors: Record<string, string> = { Pending: '#f59e0b', Completed: '#10b981', Returned: '#ef4444', Validated: '#2563eb', Scheduled: '#f59e0b', 'In Progress': '#2563eb', Deferred: '#94a3b8', Good: '#10b981', Fair: '#60a5fa', Poor: '#f59e0b', Bad: '#ef4444', 'Pending Validation': '#94a3b8' };
 const validationColors: Record<string, string> = { Pending: '#9ca3af', Returned: '#f97316', Validated: '#22c55e' };
 
 export function DashboardChart({ chart, onTabChange }: { chart: Chart; onTabChange: (tab: string) => void }) {
@@ -40,7 +40,7 @@ export function RoleDashboard(props: Props) {
   const m = dashboardMetrics(localRoadData, inspections, maintenanceRecords, scheduledInspectionIds, scheduledArchivedInspections, userRole, userId);
   const pendingAssignment: Chart = { title: 'Pending Inspector Assignments', description: 'Validated projects without an assigned inspector, by category', type: 'bar', data: m.pendingAssignments, unit: 'projects awaiting assignment', tab: 'project-management' };
   const revisions: Chart = { title: 'Projects Returned for Revision', description: 'Projects with a returned validation entry, by category', type: 'bar', data: m.returned, unit: 'projects returned for revision', tab: userRole === 'Staff - Validator' ? 'validation-management' : 'project-management' };
-  const needsMaintenance: Chart = { title: 'Projects for Maintenance', description: 'Unscheduled inspection results grouped by unsatisfactory recorded rating', type: 'donut', data: m.maintenanceNeeded, unit: 'inspection results awaiting maintenance', tab: 'maintenance-management' };
+  const needsMaintenance: Chart = { title: 'Projects for Maintenance', description: 'Unscheduled inspection results with unsatisfactory components, grouped by overall condition', type: 'donut', data: m.maintenanceNeeded, unit: 'inspection results awaiting maintenance', tab: 'maintenance-management' };
   const inspectionStatus: Chart = { title: 'Project Inspection Status', description: 'One inspection history card per project', type: 'donut', data: m.inspectionStatus, unit: 'inspection project cards', tab: 'inspection-management', centerCompleted: true };
   const maintenanceStatus: Chart = { title: 'Project Maintenance Status', description: 'Local road maintenance activities by status', type: 'donut', data: m.maintenanceStatus, unit: 'maintenance records', tab: 'maintenance-management', centerCompleted: true };
   const validationStatus: Chart = { title: 'Project Validation Status', description: 'Annual validation entries by decision', type: 'donut', data: m.validation, unit: 'validation entries', tab: 'validation-management', palette: validationColors };

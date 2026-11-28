@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PrintDocument, type PrintSection } from './PrintDocument';
 import { recordClientActivity } from '@/lib/activity-log-client';
-import { inspectionCardsByValidation, isPendingInspection, findingsSummary } from '@/lib/inspection-selection';
+import { inspectionCardsByValidation, isPendingInspection, findingsSummary, inspectionRatingScore, inspectionConditionLabel } from '@/lib/inspection-selection';
 import { hasFourDigitYear, anniversaryMinusDays, INSPECTION_DAYS_BEFORE, formatSavedProjectCurrency } from '@/lib/project-form-validation';
 import { attachmentError } from '@/lib/attachment-validation';
 
@@ -334,24 +334,8 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
   const selectedProject = localRoadList.find(item => item.id === formData.localRoadId);
   const conditionRatingOptions = ['Good', 'Fair', 'Poor', 'Bad', 'N/A'];
 
-  const getRatingScore = (rating: number | string) => {
-    const numericRating = Number(rating);
-    if (Number.isFinite(numericRating)) return numericRating;
-    const normalizedRating = String(rating).toLowerCase();
-    if (normalizedRating === 'good') return 9;
-    if (normalizedRating === 'fair') return 7;
-    if (normalizedRating === 'poor') return 4;
-    if (normalizedRating === 'bad') return 2;
-    return 0;
-  };
-
-  const getConditionLabel = (inspection: Inspection) => {
-    const rating = getRatingScore(inspection.conditionRating);
-    if (rating >= 8) return 'Good';
-    if (rating >= 5) return 'Fair';
-    if (rating > 0) return 'Poor';
-    return 'Pending Validation';
-  };
+  const getRatingScore = inspectionRatingScore;
+  const getConditionLabel = (inspection: Inspection) => inspectionConditionLabel(inspection.conditionRating);
 
   const isPendingInspectionRecord = isPendingInspection;
 
