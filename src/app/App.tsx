@@ -825,7 +825,12 @@ export default function App() {
                 </div>
               )}
               {activeTab === 'analytics' && hasAccess('analytics') && (
-                <AnalyticsDashboard />
+                <AnalyticsDashboard
+                  localRoadData={localRoadData}
+                  inspections={inspections}
+                  maintenanceRecords={maintenanceRecords}
+                  onTabChange={setActiveTab}
+                />
               )}
               {activeTab === 'validation-management' && hasAccess('validation-management') && (
                 <LocalRoadList

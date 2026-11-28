@@ -22,7 +22,7 @@ function load(file, mocks = {}) {
 
 const charts = new Proxy({}, { get: () => ({ children }) => React.createElement('div', null, children) });
 const { Dashboard } = load('src/app/components/Dashboard.tsx', { recharts: charts });
-const { AnalyticsDashboard } = load('src/app/components/AnalyticsDashboard.tsx');
+const { AnalyticsDashboard, pavementDistribution, maintenanceDistribution } = load('src/app/components/AnalyticsDashboard.tsx', { recharts: charts, './Dashboard': { Dashboard } });
 
 test('overview welcomes each signed-in user by the provided name', () => {
   for (const name of ['Ana Validator', 'Joy Inspector', 'Head Engineer', 'Admin User', 'Encoder User']) {
@@ -34,10 +34,21 @@ test('overview welcomes each signed-in user by the provided name', () => {
   }
 });
 
-test('analytics has the requested description without former KPIs or inventory', () => {
-  const html = renderToStaticMarkup(React.createElement(AnalyticsDashboard));
-  assert.ok(html.includes('Real-time pavement condition, road network classifications, and field audit status for Mabini, Batangas.'));
-  for (const removed of ['Total Road Project Investment', 'Pavement Type Ratio', 'Barangays Covered', 'Barangay Road Classification']) {
-    assert.ok(!html.includes(removed));
-  }
+test('analytics displays dashboard summaries and requested distributions', () => {
+  const html = renderToStaticMarkup(React.createElement(AnalyticsDashboard, { localRoadData: [], inspections: [], maintenanceRecords: [], onTabChange() {} }));
+  for (const label of ['Total Road Network', 'High Risk Road Sections', 'Good Pavement State', 'Recent Road Audits', 'Roads by Category', 'Pavement Condition Distribution', 'Pavement Type Ratio', 'Maintenance Status Distribution']) assert.ok(html.includes(label), label);
+  for (const removed of ['Total Road Project Investment', 'Barangays Covered', 'Barangay Road Classification', 'Monthly Road Inspection Trend']) assert.ok(!html.includes(removed), removed);
+  assert.ok(html.includes('No maintenance records available.'));
+});
+
+test('pavement counts do not double-count mixed materials or include non-road projects', () => {
+  assert.deepEqual(pavementDistribution([
+    { type: 'Road', components: 'PCCP concrete' }, { type: 'Road', components: 'Bituminous asphalt' },
+    { type: 'Road', components: 'Concrete and asphalt' }, { type: 'Road', components: 'Gravel' },
+    { type: 'Bridge', components: 'Concrete' },
+  ]), { Concrete: 1, Asphalt: 1, Mixed: 1, Unspecified: 1 });
+});
+
+test('maintenance distribution counts all four statuses', () => {
+  assert.deepEqual(maintenanceDistribution(['Scheduled', 'In Progress', 'In Progress', 'Deferred', 'Completed'].map(status => ({ status }))).map(row => row.count), [1, 2, 1, 1]);
 });

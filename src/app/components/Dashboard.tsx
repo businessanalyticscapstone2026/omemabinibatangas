@@ -18,6 +18,7 @@ interface DashboardProps {
   localRoadData: any[];
   inspections: any[];
   userName: string;
+  analyticsSummary?: boolean;
   onTabChange: (tab: string) => void;
 }
 
@@ -29,7 +30,7 @@ const conditionColors: Record<string, string> = {
 
 const isRoad = (item: any) => /road/i.test(`${item.type || ''} ${item.projectCategory || ''}`);
 
-export function Dashboard({ localRoadData, inspections, userName, onTabChange }: DashboardProps) {
+export function Dashboard({ localRoadData, inspections, userName, onTabChange, analyticsSummary = false }: DashboardProps) {
   const roads = localRoadData.filter(isRoad);
   const roadIds = new Set(roads.map(road => road.id));
   const roadInspections = inspections.filter(inspection => roadIds.has(inspection.localRoadId));
@@ -142,11 +143,11 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange }:
   ];
 
   return (
-    <main className="min-h-screen bg-[#E3EEF9] p-4 text-slate-800 sm:p-5">
-      <header className="mb-6">
+    <div className={analyticsSummary ? 'text-slate-800' : 'min-h-screen bg-[#E3EEF9] p-4 text-slate-800 sm:p-5'}>
+      {!analyticsSummary && <header className="mb-6">
         <h1 className="text-xl font-semibold tracking-tight text-blue-700">Welcome, {userName || 'User'}</h1>
         <p className="mt-1 text-sm text-slate-500">Real-time pavement condition, road network classifications, and field audit status for Mabini, Batangas.</p>
-      </header>
+      </header>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
         {summaryCards.map(({ label, value, note, icon: Icon, color, onClick }) => {
           const cardClass = `relative flex min-h-[112px] w-full items-start justify-between overflow-hidden rounded-[22px] border border-slate-200 bg-white px-5 py-4 text-left shadow-md transition ${
@@ -248,7 +249,7 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange }:
         </section>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+      {!analyticsSummary && <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
         <section className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-md">
           <div className="flex items-start justify-between border-b border-slate-100 pb-3">
             <div>
@@ -298,7 +299,7 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange }:
           </div>
           <p className="border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-700">{recentAnalysis}</p>
         </section>
-      </div>
-    </main>
+      </div>}
+    </div>
   );
 }
