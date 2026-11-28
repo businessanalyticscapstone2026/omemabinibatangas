@@ -246,7 +246,7 @@ export function AIPredictionModule({
           />}
 
           {/* Footer */}
-          <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-500 text-center">
+          <div className="rounded-2xl bg-gray-50 p-4 text-center text-xs text-gray-500">
             Engineers can review and oversee the recommended maintenance activities.
           </div>
         </>
