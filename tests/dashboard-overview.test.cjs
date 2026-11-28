@@ -22,7 +22,7 @@ function load(file, mocks = {}) {
 
 const charts = new Proxy({}, { get: () => ({ children }) => React.createElement('div', null, children) });
 const { Dashboard } = load('src/app/components/Dashboard.tsx', { recharts: charts });
-const { AnalyticsDashboard, pavementDistribution, maintenanceDistribution } = load('src/app/components/AnalyticsDashboard.tsx', { recharts: charts, './Dashboard': { Dashboard }, '@/lib/inspection-selection': load('src/lib/inspection-selection.ts') });
+const { AnalyticsDashboard, pavementDistribution, maintenanceDistribution, distributionInsight } = load('src/app/components/AnalyticsDashboard.tsx', { recharts: charts, './Dashboard': { Dashboard }, '@/lib/inspection-selection': load('src/lib/inspection-selection.ts') });
 
 test('overview welcomes each signed-in user by the provided name', () => {
   for (const name of ['Ana Validator', 'Joy Inspector', 'Head Engineer', 'Admin User', 'Encoder User']) {
@@ -61,4 +61,23 @@ test('all eleven assessment elements are counted using the latest completed insp
 
 test('maintenance distribution counts all four statuses', () => {
   assert.deepEqual(maintenanceDistribution(['Scheduled', 'In Progress', 'In Progress', 'Deferred', 'Completed'].map(status => ({ status }))).map(row => row.count), [1, 2, 1, 1]);
+});
+
+test('chart insights reflect values, ties, and empty data', () => {
+  const slices = [{ name: 'Scheduled', value: 1 }, { name: 'Completed', value: 1 }];
+  assert.match(distributionInsight(slices, 'maintenance'), /1 \(50%\) is completed/);
+  assert.match(distributionInsight(slices, 'maintenance'), /tied for the most/);
+  assert.match(distributionInsight([{ name: 'Concrete', value: 3 }, { name: 'Gravel', value: 1 }], 'pavement', 2), /Concrete is the most common at 3/);
+  assert.match(distributionInsight([], 'maintenance'), /No maintenance records/);
+});
+
+test('analytics displays chart descriptions, completed percentage and view-all button', () => {
+  const props = { localRoadData: [{ id: 'r', type: 'Road', components: 'concrete and gravel' }], inspections: [], maintenanceRecords: [{status: 'Completed'}, {status: 'Scheduled'}], onTabChange() {} };
+  const html = renderToStaticMarkup(React.createElement(AnalyticsDashboard, props));
+  assert.ok(html.includes('Recorded pavement types and road elements across road projects'));
+  assert.ok(html.includes('Local road maintenance activities by status'));
+  assert.match(html, /50%<\/strong><span[^>]*>Completed<\/span>/);
+  assert.match(html, /grid-cols-2 gap-1.5 sm:grid-cols-6/);
+  assert.match(html, /1 \(50%\) is completed/);
+  assert.ok(html.includes('View All'));
 });

@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-28 — [mine] Refine analytics charts and inspection spacing
+- **Type:** Modified
+- **Files:** `src/app/components/AnalyticsDashboard.tsx` (modified), `src/app/components/InspectionModule.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Align chart legends, summaries, navigation, and module spacing with the requested dashboard layout.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-28 — [mine] Expand analytics road element chart and align spacing
 - **Type:** Modified
 - **Files:** `src/app/components/AnalyticsDashboard.tsx` (modified), `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)

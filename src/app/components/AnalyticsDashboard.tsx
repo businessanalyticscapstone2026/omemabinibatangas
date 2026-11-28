@@ -1,4 +1,5 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import { ArrowUpRight } from 'lucide-react';
 import { Dashboard } from './Dashboard';
 import { assessmentComponents, isPendingInspection, latestByProject } from '@/lib/inspection-selection';
 
@@ -43,36 +44,58 @@ export function maintenanceDistribution(records: Array<{ status: string }>) {
   }));
 }
 
-function DistributionChart({ title, description, data, emptyMessage }: { title: string; description: string; data: Slice[]; emptyMessage: string }) {
+export function distributionInsight(data: Slice[], kind: 'pavement' | 'maintenance', unspecified = 0): string {
   const total = data.reduce((sum, item) => sum + item.value, 0);
+  if (!total) return kind === 'maintenance' ? 'No maintenance records are available for analysis.' : `No pavement types or road elements have been identified. ${unspecified} road projects have none identified.`;
+  const max = Math.max(...data.map(item => item.value));
+  const leaders = data.filter(item => item.value === max).map(item => item.name);
+  const leadingText = leaders.length > 1 ? `${leaders.join(', ')} are tied for the most at ${max} each` : `${leaders[0]} is the most common at ${max}`;
+  if (kind === 'pavement') return `${total} pavement type and road element occurrences are recorded. ${leadingText}. A project may contribute more than one element; ${unspecified} road projects have none identified. Based on the latest completed inspection or project details when no assessment is available.`;
+  const completed = data.find(item => item.name === 'Completed')?.value || 0;
+  const breakdown = data.map(item => `${item.name}: ${item.value}`).join(', ');
+  return `${total} maintenance ${total === 1 ? 'record is' : 'records are'} recorded (${breakdown}). ${completed} (${Math.round(completed / total * 100)}%) ${completed === 1 ? 'is' : 'are'} completed. ${leadingText}.`;
+}
+
+function DistributionChart({ title, description, data, emptyMessage, insight, legendBelow = false, centerLabel, onViewAll }: {
+  title: string; description: string; data: Slice[]; emptyMessage: string; insight: string;
+  legendBelow?: boolean; centerLabel?: string; onViewAll?: () => void;
+}) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const completed = data.find(item => item.name === 'Completed')?.value || 0;
   return (
     <section className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-md">
-      <div className="border-b border-slate-100 pb-3">
-        <h2 className="text-sm font-bold text-blue-900">{title}</h2>
-        <p className="mt-1 text-xs text-slate-500">{description}</p>
+      <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+        <div><h2 className="text-xs font-bold text-blue-900">{title}</h2>
+          <p className="mt-1 text-[9px] text-slate-400">{description}</p></div>
+        {onViewAll && <button type="button" onClick={onViewAll} className="flex shrink-0 items-center gap-1 text-[9px] text-blue-600 hover:text-blue-800">View All <ArrowUpRight className="h-3 w-3" /></button>}
       </div>
       {total > 0 ? (
-        <div className="flex min-h-[200px] flex-wrap items-center justify-center gap-5 py-4">
-          <div className="h-[160px] w-[160px] shrink-0">
+        <div className={legendBelow ? 'flex flex-col items-center justify-center gap-4 py-4' : 'flex min-h-[155px] flex-wrap items-center justify-center gap-3 py-4 sm:gap-6'}>
+          <div className="relative h-[140px] w-[140px] shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={data.filter(item => item.value > 0)} dataKey="value" nameKey="name" innerRadius={48} outerRadius={72} paddingAngle={2} stroke="none">
+                <Pie data={data.filter(item => item.value > 0)} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={47} outerRadius={62} paddingAngle={2} stroke="none">
                   {data.filter(item => item.value > 0).map(item => <Cell key={item.name} fill={item.color} />)}
                 </Pie>
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
+            {centerLabel && <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <strong className="text-sm text-blue-900">{Math.round(completed / total * 100)}%</strong>
+              <span className="whitespace-nowrap text-[8px] leading-none tracking-wide text-slate-400">{centerLabel}</span>
+            </div>}
           </div>
-          <div className="space-y-1.5" aria-label={`${title} breakdown`}>
+          <div className={legendBelow ? 'grid w-full grid-cols-2 gap-1.5 sm:grid-cols-6' : 'space-y-1.5'} aria-label={`${title} breakdown`}>
             {data.map(item => (
-              <div key={item.name} className="flex min-w-[150px] items-center justify-between gap-3 rounded-md border border-slate-100 px-2 py-1.5 text-[9px]" title={`${item.value} recorded`}>
-                <span className="flex items-center gap-1.5 text-slate-600"><i className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />{item.name}</span>
-                <span className="font-medium text-slate-600">{Math.round(item.value / total * 100)}%</span>
+              <div key={item.name} className={`flex items-center justify-between gap-1 rounded-md border border-slate-100 px-2 py-1.5 text-[9px] ${legendBelow ? 'min-w-0' : 'min-w-[130px]'}`} title={`${item.value} recorded`}>
+                <span className="flex min-w-0 items-center gap-1.5 text-slate-600"><i className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />{item.name}</span>
+                <span className="shrink-0 font-medium text-slate-600">{Math.round(item.value / total * 100)}%</span>
               </div>
             ))}
           </div>
         </div>
-      ) : <p className="flex min-h-[200px] items-center justify-center text-center text-sm text-slate-500">{emptyMessage}</p>}
+      ) : <p className="flex min-h-[155px] items-center justify-center text-center text-sm text-slate-500">{emptyMessage}</p>}
+      <p className="border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-700">{insight}</p>
     </section>
   );
 }
@@ -93,8 +116,8 @@ export function AnalyticsDashboard({ localRoadData, inspections, maintenanceReco
       </header>
       <Dashboard analyticsSummary localRoadData={localRoadData} inspections={inspections} userName="" onTabChange={onTabChange} afterRoadCharts={
         <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
-          <DistributionChart title="Pavement Type Ratio" description={`Share of recorded pavement types and road elements, using each project's latest completed assessment or project details. A project may have multiple elements. ${pavement.unspecified} road projects have none identified.`} data={pavementData} emptyMessage="No pavement types or road elements identified." />
-          <DistributionChart title="Maintenance Status Distribution" description="Distribution of recorded maintenance activities by status." data={maintenanceData} emptyMessage="No maintenance records available." />
+          <DistributionChart title="Pavement Type Ratio" description="Recorded pavement types and road elements across road projects" data={pavementData} emptyMessage="No pavement types or road elements identified." insight={distributionInsight(pavementData, 'pavement', pavement.unspecified)} legendBelow />
+          <DistributionChart title="Maintenance Status Distribution" description="Local road maintenance activities by status" data={maintenanceData} emptyMessage="No maintenance records available." insight={distributionInsight(maintenanceData, 'maintenance')} centerLabel="Completed" onViewAll={() => onTabChange('maintenance-management')} />
         </div>
       } />
     </main>

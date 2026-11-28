@@ -670,7 +670,7 @@ export function InspectionModule({ inspections, localRoadList, onAddInspection, 
         }}
       />
     )}
-    <div className="inspection-results flex min-h-screen flex-col bg-[#E3EEF9] p-6 text-slate-800 sm:px-7">
+    <div className="inspection-results flex min-h-screen flex-col bg-[#E3EEF9] p-6 text-slate-800">
       <div className="flex w-full flex-1 flex-col">
         <div className="mb-9 flex flex-wrap items-start justify-between gap-4">
           <div>
