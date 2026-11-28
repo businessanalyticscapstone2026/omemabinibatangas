@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, Loader2, CheckCircle } from 'lucide-react';
+import { Sparkles, Loader2, CheckCircle, CalendarDays, MapPin } from 'lucide-react';
 import { findingsSummary } from '@/lib/inspection-selection';
+import { InspectionResultDialog } from './InspectionResultDialog';
 
 export interface PredictionResult {
   localRoadId: string;
@@ -46,6 +47,7 @@ export function AIPredictionModule({
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   const completedInspections = inspections.filter((inspection) =>
     inspection.isScheduledAnnualFollowUp !== true &&
@@ -152,6 +154,7 @@ export function AIPredictionModule({
       <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-blue-700">AI Maintenance Recommendation</h1>
+          <p className="mt-1 text-sm text-slate-500">Maintenance recommendations generated from field inspection component rating and inspector findings.</p>
         </div>
         <button
           onClick={() => void generatePredictions(true)}
@@ -206,27 +209,26 @@ export function AIPredictionModule({
       {/* Results State */}
       {(
         <>
-          <div className="min-w-0 max-w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full min-w-[900px] border-separate border-spacing-0 text-left">
-              <thead className="border-b border-gray-200 bg-gray-50">
-                <tr>{['Project Name', 'Category', 'Condition', 'AI Justification', 'Recommended Maintenance Activity'].map(label => <th key={label} scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-600">{label}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
-                {rows.map(({ road, inspection, prediction, stale }) => {
-                  const rating = Number(inspection.conditionRating);
-                  const condition = Number.isFinite(rating) && rating > 0 ? (rating >= 8 ? 'Good' : rating >= 5 ? 'Fair' : 'Poor') : (road.condition || prediction?.condition || 'Not rated');
-                  return <tr key={road.id} className="hover:bg-blue-50/60">
-                    <td className="px-6 py-4 font-medium text-[#0ea5e9]">{road.projectName || road.name || 'N/A'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{road.projectCategory || road.type || 'N/A'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{condition}</td>
-                    <td className="whitespace-pre-line px-6 py-4 text-sm leading-6 text-slate-700">{prediction ? <>{prediction.justification.replace(/\s*(Inspection findings:)/i, '\n$1')}{stale && <span className="mt-2 block text-amber-700">{errorMessage ? 'Update failed. Retry to refresh.' : 'Updating from the latest inspection.'}</span>}</> : <span className="text-slate-500">{errorMessage ? 'Not generated. Retry to generate.' : 'Generating recommendation…'}</span>}</td>
-                    <td className="px-6 py-4 text-sm leading-6 text-slate-700">{prediction ? prediction.recommendation : <span className="text-slate-500">{errorMessage ? 'Not generated. Retry to generate.' : 'Generating recommendation…'}</span>}</td>
-                  </tr>;
-                })}
-                {rows.length === 0 && <tr><td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-600">No projects have a Fair, Poor, or Bad rating in their latest completed inspection. Projects rated only Good or N/A are not shown.</td></tr>}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            {rows.map(({ road, inspection, prediction, stale }) => {
+              const rating = Number(inspection.conditionRating);
+              const condition = Number.isFinite(rating) && rating > 0 ? (rating >= 8 ? 'Good' : rating >= 5 ? 'Fair' : 'Poor') : (road.condition || prediction?.condition || 'Not rated');
+              const badgeColor = (value: string) => value === 'Good' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : value === 'Fair' ? 'border-amber-200 bg-amber-50 text-amber-700' : value === 'Poor' ? 'border-orange-200 bg-orange-50 text-orange-700' : value === 'Bad' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-slate-50 text-slate-600';
+              const issues = Object.entries(inspection.conditionRatings || {}).filter(([, value]) => actionableRatings.has(String(value)));
+              const placeholder = errorMessage ? 'Not generated. Retry to generate.' : 'Generating recommendation…';
+              return <button key={road.id} type="button" onClick={() => setSelectedProjectId(road.id)} aria-label={`View inspection result for ${road.projectName || road.name || 'project'}`} className="w-full overflow-hidden rounded-2xl border border-slate-200 border-l-4 border-l-amber-400 bg-white text-left shadow-sm transition hover:border-blue-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                <div className="flex flex-wrap items-start justify-between gap-3 px-5 pb-4 pt-5">
+                  <div className="min-w-0"><h2 className="text-base font-bold text-slate-900">{road.projectName || road.name || 'N/A'}</h2>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500"><span>{road.projectCategory || road.type || 'N/A'}</span><span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{road.barangay || 'Barangay not specified'}</span><span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />Inspected {inspection.date || 'Date not specified'}</span></div>
+                  </div><span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${badgeColor(condition)}`}>{condition}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 border-y border-slate-100 bg-slate-50/70 px-5 py-3"><span className="mr-1 text-xs font-semibold text-slate-500">Detected Component Issues:</span>{issues.map(([name, value]) => <span key={name} className={`rounded-md border px-2 py-1 text-xs font-semibold ${badgeColor(String(value))}`}>{name} · {String(value)}</span>)}</div>
+                <div className="grid grid-cols-1 gap-3 p-5 lg:grid-cols-2"><section className="rounded-xl border border-slate-200 bg-white p-4"><h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">AI Justification</h3><p className="whitespace-pre-line text-sm leading-6 text-slate-700">{prediction ? prediction.justification.replace(/\s*(Inspection findings:)/i, '\n$1') : placeholder}</p>{prediction && stale && <p className="mt-2 text-sm text-amber-700">{errorMessage ? 'Update failed. Retry to refresh.' : 'Updating from the latest inspection.'}</p>}</section><section className="rounded-xl border border-blue-100 bg-blue-50/40 p-4"><h3 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-blue-700"><Sparkles className="h-4 w-4" />Recommended Maintenance Activity</h3><p className="whitespace-pre-line text-sm leading-6 text-slate-700">{prediction ? prediction.recommendation : placeholder}</p></section></div>
+              </button>;
+            })}
+            {rows.length === 0 && <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-600">No projects have a Fair, Poor, or Bad rating in their latest completed inspection. Projects rated only Good or N/A are not shown.</div>}
           </div>
+          <InspectionResultDialog inspection={rows.find(row => row.road.id === selectedProjectId)?.inspection || null} road={rows.find(row => row.road.id === selectedProjectId)?.road || null} onClose={() => setSelectedProjectId(null)} />
 
           {/* Footer */}
           <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-500 text-center">

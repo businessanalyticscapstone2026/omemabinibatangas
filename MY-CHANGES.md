@@ -1006,3 +1006,8 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 - Display empty chart axes or grey donut rings instead of replacing charts with empty-state messages, including Analytics charts.
 - Show completed percentages in inspection and maintenance donuts, match validation colors to badge states, align Dashboard bar styling with Analytics, and update requested subtitles.
 - Dashboard and Analytics tests, TypeScript, and production build passed.
+
+### AI recommendation cards and inspection details
+- Replace the recommendation table with keyboard-accessible project cards showing category, barangay, inspection date, condition, affected components and AI output; add the requested module subtitle.
+- Open the card's corresponding inspection in a dialog with assessment ratings, remarks and attachment previews while preserving automatic recommendation generation.
+- Added card and inspection-dialog interaction tests. TypeScript and production build passed; full suite: 235 passed and the same two pre-existing AI generation timing tests failed.

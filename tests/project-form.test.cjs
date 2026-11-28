@@ -21,6 +21,15 @@ function loadTs(relative, mocks = {}) {
   m.require = name => name === './FilterControls' ? { DateCalendarButton: () => null, StyledFilterSelect: ({label,value,onChange,options,disabled,title,triggerClassName,onOpenChange,open}) => React.createElement('select', {'aria-label':label,value,disabled,title,className:triggerClassName,'data-open':String(open),onClick:()=>onOpenChange?.(true),onChange:e=>onChange(e.target.value)}, options.map(o=>React.createElement('option',{key:o.value,value:o.value},o.label))) } : Object.hasOwn(mocks, name) ? mocks[name] : originalRequire(name);
   m._compile(code, filename); return m.exports;
 }
+const inspectionSelection = loadTs('src/lib/inspection-selection.ts');
+const dialogMocks = {
+  Dialog: ({ open, children }) => open ? React.createElement('div', { role: 'dialog' }, children) : null,
+  DialogContent: ({ children }) => React.createElement('div', null, children),
+  DialogTitle: ({ children }) => React.createElement('h2', null, children),
+  DialogDescription: ({ children }) => React.createElement('p', null, children),
+};
+const inspectionResultDialog = loadTs('src/app/components/InspectionResultDialog.tsx', { './ui/dialog': dialogMocks, '@/lib/inspection-selection': inspectionSelection });
+const aiMocks = { '@/lib/inspection-selection': inspectionSelection, './InspectionResultDialog': inspectionResultDialog };
 const validation = loadTs('src/lib/project-form-validation.ts');
 const attachmentValidation = loadTs('src/lib/attachment-validation.ts');
 let uploadCalls = [];
@@ -1063,19 +1072,27 @@ test('returned validation status shows the year in the badge and a bold header',
   await reset();
 });
 
-test('AI recommendations render project data in a prioritized table', async () => {
-  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', {'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts')});
-  const roads=[{id:'a',name:'Road A',projectName:'Project Alpha',projectCategory:'Local Road'}, {id:'b',name:'Road B',projectName:'Project Beta',projectCategory:'Bridge'}];
-  const inspections=roads.map(r=>({localRoadId:r.id,date:'2026-01-01',conditionRatings:{Concrete:'Fair'}}));
-  const predictions=roads.map((r,i)=>({localRoadId:r.id,localRoadName:r.name,type:'Wrong category',condition:'Fair',priorityScore:i+1,justification:'Cracks',recommendation:'Repair',inspectionFingerprint:JSON.stringify(['', '2026-01-01',null,[['Concrete','Fair']],[],''])}));
+test('AI recommendation cards open the corresponding inspection details', async () => {
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', aiMocks);
+  const roads=[{id:'a',name:'Road A',projectName:'Project Alpha',projectCategory:'Local Road'}, {id:'b',name:'Road B',projectName:'Project Beta',projectCategory:'Bridge',barangay:'Mainit',location:'Mainit, Mabini'}];
+  const inspections=roads.map(r=>({id:'i-'+r.id,localRoadId:r.id,date:'2026-01-01',inspector:'Juan',conditionRating:6,conditionRatings:{Concrete:'Fair', Drainage:'Bad', Asphalt:'Good', Gravel:'N/A'},conditionRemarks:{Concrete:'Cracks'},conditionAttachments:{Concrete:[{name:'evidence.jpg',type:'image/jpeg',dataUrl:'https://example.test/image.jpg'}]}}));
+  const predictions=inspections.map((item,i)=>({localRoadId:item.localRoadId,condition:'Fair',priorityScore:i+1,justification:'Cracks',recommendation:'Repair',inspectionFingerprint:JSON.stringify([item.id,item.date,6,Object.entries(item.conditionRatings).sort(([a],[b])=>a.localeCompare(b)),Object.entries(item.conditionRemarks),''])}));
   await reset();await act(async()=>root.render(React.createElement(AIPredictionModule,{localRoadData:roads,inspections,predictions,onPredictionsChange(){}})));
-  assert.deepEqual([...container.querySelectorAll('th')].map(x=>x.textContent),['Project Name','Category','Condition','AI Justification','Recommended Maintenance Activity']);
-  const rows=[...container.querySelectorAll('tbody tr')];assert.equal(rows.length,2);assert.deepEqual([...rows[0].cells].map(x=>x.textContent),['Project Beta','Bridge','Fair','Cracks','Repair']);
+  assert.match(container.textContent,/Maintenance recommendations generated from field inspection component rating and inspector findings/);
+  assert.equal(container.querySelector('table'),null);
+  const cards=[...container.querySelectorAll('button[aria-label^="View inspection result for"]')];assert.equal(cards.length,2);
+  assert.match(cards[0].textContent,/Project Beta/);assert.match(cards[0].textContent,/Bridge/);assert.match(cards[0].textContent,/Mainit/);assert.match(cards[0].textContent,/2026-01-01/);
+  assert.match(cards[0].textContent,/Concrete · Fair/);assert.match(cards[0].textContent,/Drainage · Bad/);assert.doesNotMatch(cards[0].textContent,/Asphalt · Good|Gravel · N\/A/);
+  assert.match(cards[0].textContent,/AI Justification/);assert.match(cards[0].textContent,/Recommended Maintenance Activity/);assert.match(cards[0].textContent,/Cracks/);assert.match(cards[0].textContent,/Repair/);
+  await act(async()=>cards[0].click());
+  const dialog=container.querySelector('[role=dialog]');assert.ok(dialog);assert.match(dialog.textContent,/Project Beta/);assert.match(dialog.textContent,/Juan/);assert.match(dialog.textContent,/Inspection Date/);assert.match(dialog.textContent,/Local Road Condition Assessment/);assert.match(dialog.textContent,/Cracks/);assert.match(dialog.textContent,/evidence.jpg/);
+  await act(async()=>[...dialog.querySelectorAll('button')].find(button=>button.textContent.includes('evidence.jpg')).click());
+  assert.equal(container.querySelectorAll('[role=dialog]').length,2);assert.ok(container.querySelector('img[alt="evidence.jpg"]'));
   await reset();
 });
 
 test('AI generates only missing or changed inspections automatically and retains other results', async () => {
-  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', {'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts')});
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', aiMocks);
   const roads=[{id:'a',name:'First',condition:'Fair'}, {id:'b',name:'New',condition:'Poor'}];
   let inspections=[{id:'i1',localRoadId:'a',date:'2026-01-01',conditionRatings:{Concrete:'Fair'},conditionRating:6}];
   const fingerprint=JSON.stringify(['i1','2026-01-01',6,[['Concrete','Fair']],[],'']);
@@ -1096,7 +1113,7 @@ test('AI generates only missing or changed inspections automatically and retains
 });
 
 test('automatic recommendation failure is visible and retry does not loop', async () => {
-  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', {'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts')});
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', aiMocks);
   const roads=[{id:'a',name:'Road',condition:'Fair'}], inspections=[{id:'i',localRoadId:'a',date:'2026-01-01',conditionRating:6,conditionRatings:{Concrete:'Fair'}}];
   let calls=0;const previousFetch=global.fetch;
   global.fetch=async()=>{calls++;return {ok:false,json:async()=>({message:'AI service unavailable'})};};
@@ -1109,7 +1126,7 @@ test('automatic recommendation failure is visible and retry does not loop', asyn
 });
 
 test('AI generation uses latest eligible inspection dates and stores the inspection fingerprint', async () => {
-  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', {'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts')});
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx', aiMocks);
   const roads=[{id:'a',name:'Road',condition:'Fair',lastInspection:'2024-01-01'}];
   const inspections=[{id:'i',localRoadId:'a',date:'2026-01-01',conditionRatings:{Concrete:'Fair'},conditionRating:6,remarks:'Crack'}];
   let requestBody,saved; const previousFetch=global.fetch;
@@ -1164,7 +1181,7 @@ test('maintenance details and print contain earlier and later activity for the p
 });
 
 test('AI waits for saved recommendations before deciding whether automatic generation is needed', async () => {
-  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx',{'@/lib/inspection-selection':loadTs('src/lib/inspection-selection.ts')});
+  const {AIPredictionModule}=loadTs('src/app/components/AIPredictionModule.tsx',aiMocks);
   const roads=[{id:'a',name:'Road',condition:'Fair'}], inspections=[{id:'i',localRoadId:'a',date:'2026-01-01',conditionRating:6,conditionRatings:{Concrete:'Fair'}}];
   let calls=0;const previousFetch=global.fetch;global.fetch=async()=>{calls++;throw Error('unexpected');};
   const fingerprint=JSON.stringify(['i','2026-01-01',6,[['Concrete','Fair']],[],'']);
