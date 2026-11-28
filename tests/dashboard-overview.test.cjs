@@ -22,7 +22,7 @@ function load(file, mocks = {}) {
 
 const charts = new Proxy({}, { get: () => ({ children }) => React.createElement('div', null, children) });
 const { Dashboard } = load('src/app/components/Dashboard.tsx', { recharts: charts });
-const { AnalyticsDashboard, pavementDistribution, maintenanceDistribution } = load('src/app/components/AnalyticsDashboard.tsx', { recharts: charts, './Dashboard': { Dashboard } });
+const { AnalyticsDashboard, pavementDistribution, maintenanceDistribution } = load('src/app/components/AnalyticsDashboard.tsx', { recharts: charts, './Dashboard': { Dashboard }, '@/lib/inspection-selection': load('src/lib/inspection-selection.ts') });
 
 test('overview welcomes each signed-in user by the provided name', () => {
   for (const name of ['Ana Validator', 'Joy Inspector', 'Head Engineer', 'Admin User', 'Encoder User']) {
@@ -44,12 +44,19 @@ test('analytics displays dashboard summaries and requested distributions', () =>
   assert.ok(html.indexOf('Maintenance Status Distribution') < html.indexOf('Recent Road Field Inspections'));
 });
 
-test('pavement counts do not double-count mixed materials or include non-road projects', () => {
-  assert.deepEqual(pavementDistribution([
-    { type: 'Road', components: 'PCCP concrete' }, { type: 'Road', components: 'Bituminous asphalt' },
-    { type: 'Road', components: 'Concrete and asphalt' }, { type: 'Road', components: 'Gravel' },
-    { type: 'Bridge', components: 'Concrete' },
-  ]), { Concrete: 1, Asphalt: 1, Mixed: 1, Unspecified: 1 });
+test('all eleven assessment elements are counted using the latest completed inspection and N/A is excluded', () => {
+  const names = ['Concrete', 'Asphalt', 'Gravel', 'Earth', 'Shoulder', 'Side Drain', 'Sidewalk', 'Drainage', 'Solar Lights', 'Slope Protection', 'Retaining Wall'];
+  const roads = [{ id: 'a', type: 'Road' }, { id: 'b', type: 'Road', components: 'PCCP and asphalt' }, { id: 'c', type: 'Road' }, { id: 'd', type: 'Bridge', components: 'concrete' }];
+  const inspections = [
+    { id: 'old', localRoadId: 'a', date: '2024-01-01', conditionRatings: { Concrete: 'N/A' } },
+    { id: 'new', localRoadId: 'a', date: '2025-01-01', conditionRatings: Object.fromEntries(names.map(name => [name, 'Good'])) },
+    { id: 'pending', localRoadId: 'a', date: '2026-01-01', isScheduledAnnualFollowUp: true, conditionRatings: { Concrete: 'N/A' } },
+  ];
+  const result = pavementDistribution(roads, inspections);
+  assert.equal(result.unspecified, 1);
+  for (const name of names) assert.equal(result.counts[name], ['Concrete', 'Asphalt'].includes(name) ? 2 : 1, name);
+  const na = pavementDistribution([{ id: 'a', type: 'Road', components: 'concrete' }], [{ id: 'x', localRoadId: 'a', date: '2025-01-01', conditionRatings: { Concrete: 'N/A' } }]);
+  assert.equal(na.counts.Concrete, 0);
 });
 
 test('maintenance distribution counts all four statuses', () => {

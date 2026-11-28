@@ -145,7 +145,7 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange, a
   ];
 
   return (
-    <div className={analyticsSummary ? 'text-slate-800' : 'min-h-screen bg-[#E3EEF9] p-4 text-slate-800 sm:p-5'}>
+    <div className={analyticsSummary ? 'text-slate-800' : 'min-h-screen bg-[#E3EEF9] p-6 text-slate-800'}>
       {!analyticsSummary && <header className="mb-6">
         <h1 className="text-xl font-semibold tracking-tight text-blue-700">Welcome, {userName || 'User'}</h1>
         <p className="mt-1 text-sm text-slate-500">Real-time pavement condition, road network classifications, and field audit status for Mabini, Batangas.</p>
