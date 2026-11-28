@@ -144,8 +144,8 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange }:
   return (
     <main className="min-h-screen bg-[#E3EEF9] p-4 text-slate-800 sm:p-5">
       <header className="mb-6">
-        <h1 className="text-xl font-semibold tracking-tight text-blue-700">Dashboard Overview</h1>
-        <p className="mt-1 text-sm text-slate-500">Welcome, {userName || 'User'}</p>
+        <h1 className="text-xl font-semibold tracking-tight text-blue-700">Welcome, {userName || 'User'}</h1>
+        <p className="mt-1 text-sm text-slate-500">Real-time pavement condition, road network classifications, and field audit status for Mabini, Batangas.</p>
       </header>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
         {summaryCards.map(({ label, value, note, icon: Icon, color, onClick }) => {

@@ -78,6 +78,13 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 
 <!-- NEW-ENTRY-MARKER — scripts/log-change.sh inserts new entries directly below this line, newest first. Do not delete this line. -->
 
+### 2026-11-28 — [mine] Move welcome message to dashboard heading
+- **Type:** Modified
+- **Files:** `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (modified)
+- **What & why:** Show the signed-in user's name as the dashboard heading and restore the overview description beneath it.
+- **Status:** ✅ Kept
+- **Original code affected:** none
+
 ### 2026-11-28 — [mine] Personalize dashboard overview and clear analytics
 - **Type:** Modified
 - **Files:** `src/app/App.tsx` (modified), `src/app/components/AnalyticsDashboard.tsx` (modified), `src/app/components/Dashboard.tsx` (modified), `tests/dashboard-overview.test.cjs` (new)

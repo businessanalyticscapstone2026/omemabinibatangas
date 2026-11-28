@@ -27,9 +27,10 @@ const { AnalyticsDashboard } = load('src/app/components/AnalyticsDashboard.tsx')
 test('overview welcomes each signed-in user by the provided name', () => {
   for (const name of ['Ana Validator', 'Joy Inspector', 'Head Engineer', 'Admin User', 'Encoder User']) {
     const html = renderToStaticMarkup(React.createElement(Dashboard, { localRoadData: [], inspections: [], userName: name, onTabChange() {} }));
-    assert.match(html, /Dashboard Overview/);
-    assert.ok(html.includes(`Welcome, ${name}`));
+    assert.match(html, new RegExp(`<h1[^>]*>Welcome, ${name}</h1>`));
+    assert.ok(html.includes('Real-time pavement condition, road network classifications, and field audit status for Mabini, Batangas.'));
     assert.ok(!html.includes('Road Monitoring Dashboard'));
+    assert.ok(!html.includes('Dashboard Overview'));
   }
 });
 
