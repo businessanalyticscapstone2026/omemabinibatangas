@@ -1020,3 +1020,8 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 - Group unscheduled inspection results with Fair/Poor/Bad component issues by the same overall condition shown in Inspection Details, using a shared scoring helper.
 - Preserve the component-based eligibility and scheduled-record exclusion; include Good or Pending Validation when that is the overall displayed condition, rather than mislabeling it as the worst component.
 - Dashboard and inspection tests, TypeScript, and production build passed.
+
+### Maintenance donut excludes Good overall conditions
+- Restrict the maintenance donut to unscheduled completed inspection results whose overall displayed condition is Fair, Poor or Bad; do not use component ratings to decide inclusion.
+- Good and unscored results are excluded even when an element is unsatisfactory. Inspection Details currently maps all positive scores below 5 to Poor, so it does not presently produce an overall Bad label.
+- Dashboard and inspection tests and TypeScript passed.

@@ -40,12 +40,12 @@ test('assignment and revision graphs follow validation and update when assigned'
   assert.deepEqual(metrics.dashboardMetrics(projects.map(p => p.id === 'a' ? { ...p, inspectorId: 'i1' } : p), inspections, [], [], [], 'Head Engineer', '').pendingAssignments, []);
 });
 test('maintenance graph counts actionable unscheduled results, excludes good and scheduled', () => {
-  assert.deepEqual(calc('Head Engineer').maintenanceNeeded.map(item => item.value), [0, 1, 1, 0]);
+  assert.deepEqual(calc('Head Engineer').maintenanceNeeded.map(item => item.value), [1, 1, 0]);
   const result = metrics.dashboardMetrics(projects, inspections, [{ inspectionId: 'b-old', status: 'Scheduled' }], [], [], 'Staff - Encoder', '');
-  assert.deepEqual(result.maintenanceNeeded.map(item => item.value), [0, 0, 1, 0]);
+  assert.deepEqual(result.maintenanceNeeded.map(item => item.value), [0, 1, 0]);
   assert.deepEqual(result.maintenanceStatus.map(item => item.value), [1, 0, 0, 0]);
   const archived = metrics.dashboardMetrics(projects, inspections, [], ['c-done'], [], 'Staff - Encoder', '');
-  assert.deepEqual(archived.maintenanceNeeded.map(item => item.value), [0, 1, 0, 0]);
+  assert.deepEqual(archived.maintenanceNeeded.map(item => item.value), [1, 0, 0]);
 });
 
 test('maintenance chart groups by the inspection details overall condition, not the worst component', () => {
@@ -54,11 +54,12 @@ test('maintenance chart groups by the inspection details overall condition, not 
     { id: 'good', localRoadId: 'b', conditionRating: 9, conditionRatings: { Drainage: 'Fair', Concrete: 'Good' } },
     { id: 'poor', localRoadId: 'c', conditionRating: 2, conditionRatings: { Concrete: 'Bad' } },
     { id: 'unknown', localRoadId: 'd', conditionRating: 0, conditionRatings: { Concrete: 'Fair' } },
+    { id: 'fair-no-elements', localRoadId: 'd', conditionRating: 5, conditionRatings: {} },
     { id: 'no-issues', localRoadId: 'a', conditionRating: 9, conditionRatings: { Concrete: 'Good' } },
     { id: 'pending', localRoadId: 'a', isScheduledAnnualFollowUp: true, conditionRating: 5, conditionRatings: { Concrete: 'Fair' } },
   ];
   const result = metrics.dashboardMetrics(projects, assessed, [], ['poor'], [], 'Head Engineer', '');
-  assert.deepEqual(result.maintenanceNeeded.map(item => [item.name, item.value]), [['Good', 1], ['Fair', 1], ['Poor', 0], ['Pending Validation', 1]]);
+  assert.deepEqual(result.maintenanceNeeded.map(item => [item.name, item.value]), [['Fair', 2], ['Poor', 0], ['Bad', 0]]);
   assert.equal(selection.inspectionConditionLabel(7), 'Fair');
   assert.equal(selection.inspectionConditionLabel(2), 'Poor');
 });

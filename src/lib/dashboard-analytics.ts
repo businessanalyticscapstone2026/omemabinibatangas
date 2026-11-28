@@ -35,11 +35,10 @@ export function dashboardMetrics(projects: RecordItem[], inspections: RecordItem
   }
   const scheduled = Array.from(new Set([...scheduledIds, ...maintenance.map(item => item.inspectionId).filter(Boolean)]));
   const scheduledSet = new Set(scheduled);
-  const eligible = inspections.filter(item => !isPendingInspection(item as any) && !scheduledSet.has(item.id) && Object.values(item.conditionRatings || {}).some(rating => ['fair', 'poor', 'bad'].includes(String(rating).trim().toLowerCase())));
-  // A project can need maintenance because of an individual component even
-  // when its overall inspection condition is Good. Count its displayed overall
-  // condition rather than replacing it with the worst component rating.
-  const maintenanceNeeded = ['Good', 'Fair', 'Poor', 'Pending Validation'].map(name => ({
+  const eligible = inspections.filter(item => !isPendingInspection(item as any) && !scheduledSet.has(item.id));
+  // Match the overall condition in Inspection Details, not individual elements.
+  // Good and unscored results are excluded even if an element has an issue.
+  const maintenanceNeeded = ['Fair', 'Poor', 'Bad'].map(name => ({
     name, value: eligible.filter(item => inspectionConditionLabel(item.conditionRating) === name).length,
   }));
   const status = ['Scheduled', 'In Progress', 'Deferred', 'Completed'].map(name => ({ name, value: maintenance.filter(item => item.status === name).length }));
