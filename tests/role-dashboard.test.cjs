@@ -68,3 +68,33 @@ test('role dashboards render only requested charts and keep analytics charts out
     for (const label of ['Roads by Category', 'Pavement Condition Distribution', 'Monthly Road Inspection Trend', 'Recent Road Field Inspections']) assert.ok(!html.includes(label), `${role}: ${label}`);
   }
 });
+
+test('empty charts stay visible, completed centers show percentages and validation uses badge colors', () => {
+  const captured = [];
+  const componentMocks = new Proxy({}, { get: (_, name) => props => {
+    captured.push({ name, props });
+    return React.createElement('div', null, props.children);
+  } });
+  const { DashboardChart } = load('src/app/components/RoleDashboard.tsx', { recharts: componentMocks, '@/lib/dashboard-analytics': metrics, './Dashboard': dashboard });
+  const render = chart => renderToStaticMarkup(React.createElement(DashboardChart, { chart, onTabChange() {} }));
+  const emptyBar = render({ title: 'Pending Inspector Assignments', type: 'bar', data: [], unit: 'projects', tab: 'project-management' });
+  assert.match(emptyBar, /Pending Inspector Assignments chart: no data/);
+  const bar = captured.find(item => item.name === 'BarChart');
+  assert.deepEqual(bar.props.data, []);
+  assert.deepEqual(bar.props.margin, { top: 12, right: 4, bottom: 0, left: -20 });
+  assert.equal(captured.find(item => item.name === 'Bar').props.maxBarSize, 28);
+  const emptyDonut = render({ title: 'Project Inspection Status', type: 'donut', data: [{ name: 'Pending', value: 0 }, { name: 'Completed', value: 0 }], unit: 'projects', tab: 'inspection-management', centerCompleted: true });
+  assert.match(emptyDonut, /border-slate-200/);
+  assert.match(emptyDonut, /0%<\/strong><span[^>]*>Completed/);
+  assert.doesNotMatch(emptyDonut, /NaN/);
+  const donut = render({ title: 'Project Maintenance Status', type: 'donut', data: [{ name: 'Scheduled', value: 1 }, { name: 'Completed', value: 3 }], unit: 'records', tab: 'maintenance-management', centerCompleted: true });
+  assert.match(donut, /75%<\/strong><span[^>]*>Completed/);
+  const validator = renderToStaticMarkup(React.createElement(RoleDashboard, { localRoadData: projects, inspections, maintenanceRecords: [], scheduledInspectionIds: [], scheduledArchivedInspections: [], userName: 'Tester', userRole: 'Staff - Validator', userId: '', onTabChange() {} }));
+  assert.match(validator, /background-color:#9ca3af/);
+  assert.match(validator, /background-color:#f97316/);
+  assert.match(validator, /background-color:#22c55e/);
+  const inspector = renderToStaticMarkup(React.createElement(RoleDashboard, { localRoadData: projects, inspections, maintenanceRecords: [], scheduledInspectionIds: [], scheduledArchivedInspections: [], userName: 'Tester', userRole: 'Staff - Inspector', userId: 'i1', onTabChange() {} }));
+  assert.match(inspector, /Assigned pending inspection project, by category/);
+  const head = renderToStaticMarkup(React.createElement(RoleDashboard, { localRoadData: projects, inspections, maintenanceRecords: [], scheduledInspectionIds: [], scheduledArchivedInspections: [], userName: 'Tester', userRole: 'Head Engineer', userId: '', onTabChange() {} }));
+  assert.doesNotMatch(head, /worst recorded rating/);
+});

@@ -69,19 +69,18 @@ function DistributionChart({ title, description, data, emptyMessage, insight, le
           <p className="mt-1 text-[9px] text-slate-400">{description}</p></div>
         {onViewAll && <button type="button" onClick={onViewAll} className="flex shrink-0 items-center gap-1 text-[9px] text-blue-600 hover:text-blue-800">View All <ArrowUpRight className="h-3 w-3" /></button>}
       </div>
-      {total > 0 ? (
         <div className={legendBelow ? 'flex flex-col items-center justify-center gap-4 py-4' : 'flex min-h-[155px] flex-wrap items-center justify-center gap-3 py-4 sm:gap-6'}>
-          <div className="relative h-[140px] w-[140px] shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="relative h-[140px] w-[140px] shrink-0" aria-label={total ? `${title} chart` : emptyMessage}>
+            {total > 0 ? <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={data.filter(item => item.value > 0)} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={47} outerRadius={62} paddingAngle={2} stroke="none">
                   {data.filter(item => item.value > 0).map(item => <Cell key={item.name} fill={item.color} />)}
                 </Pie>
                 <Tooltip />
               </PieChart>
-            </ResponsiveContainer>
+            </ResponsiveContainer> : <div aria-hidden="true" className="absolute left-2 top-2 h-[124px] w-[124px] rounded-full border-[15px] border-slate-200" />}
             {centerLabel && <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <strong className="text-sm text-blue-900">{Math.round(completed / total * 100)}%</strong>
+              <strong className="text-sm text-blue-900">{total ? Math.round(completed / total * 100) : 0}%</strong>
               <span className="whitespace-nowrap text-[8px] leading-none tracking-wide text-slate-400">{centerLabel}</span>
             </div>}
           </div>
@@ -89,12 +88,11 @@ function DistributionChart({ title, description, data, emptyMessage, insight, le
             {data.map((item, index) => (
               <div key={item.name} className={`flex items-center justify-between gap-1 rounded-md border border-slate-100 px-2 py-1.5 text-[9px] ${legendBelow ? `min-w-0 ${index < 8 ? 'sm:col-span-3' : 'sm:col-span-4'}` : 'min-w-[130px]'}`} title={`${item.value} recorded`}>
                 <span className="flex min-w-0 items-center gap-1.5 text-slate-600"><i className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />{item.name}</span>
-                <span className="shrink-0 font-medium text-slate-600">{Math.round(item.value / total * 100)}%</span>
+                <span className="shrink-0 font-medium text-slate-600">{total ? Math.round(item.value / total * 100) : 0}%</span>
               </div>
             ))}
           </div>
         </div>
-      ) : <p className="flex min-h-[155px] items-center justify-center text-center text-sm text-slate-500">{emptyMessage}</p>}
       <p className="border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-700">{insight}</p>
     </section>
   );

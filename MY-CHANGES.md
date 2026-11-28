@@ -1001,3 +1001,8 @@ The hook can always be bypassed for a single commit with `git commit --no-verify
 - Replace Dashboard-only charts with role-specific assignment, validation, inspection and maintenance charts with live breakdowns and role-appropriate navigation; retain the separate Analytics charts and dashboard KPIs.
 - Limit inspector dashboard data to currently assigned projects and keep scheduled maintenance results out of the maintenance-needed chart.
 - Added role aggregation and assignment regression tests. TypeScript and production build passed; focused tests passed. The full suite reported two unrelated AI generation timing test failures.
+
+### Dashboard chart presentation
+- Display empty chart axes or grey donut rings instead of replacing charts with empty-state messages, including Analytics charts.
+- Show completed percentages in inspection and maintenance donuts, match validation colors to badge states, align Dashboard bar styling with Analytics, and update requested subtitles.
+- Dashboard and Analytics tests, TypeScript, and production build passed.

@@ -193,19 +193,15 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange, a
             </div>
             <span className="flex items-center gap-1 text-[9px] text-slate-500"><i className="h-2 w-2 rounded-sm bg-blue-600" /> count</span>
           </div>
-          {categoryData.length ? (
             <ResponsiveContainer width="100%" height={155}>
               <BarChart data={categoryData} margin={{ top: 12, right: 4, bottom: 0, left: -20 }}>
                 <CartesianGrid vertical={false} stroke="#e8eef7" strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 8, fill: '#64748b' }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 8, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 8, fill: '#64748b' }} axisLine={false} tickLine={false} domain={categoryData.length ? [0, 'auto'] : [0, 4]} tickFormatter={categoryData.length ? undefined : () => ''} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={28} />
               </BarChart>
             </ResponsiveContainer>
-          ) : (
-            <div className="flex h-[155px] items-center justify-center text-xs text-slate-400">No road projects have been cataloged yet.</div>
-          )}
           <p className="border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-700">{categoryAnalysis}</p>
         </section>
 
@@ -219,14 +215,14 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange, a
           </div>
           <div className="flex min-h-[155px] items-center justify-center gap-3 sm:gap-6">
             <div className="relative h-[140px] w-[140px] shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
+              {conditionData.some(entry => entry.value > 0) ? <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={conditionData} dataKey="value" cx="50%" cy="50%" innerRadius={47} outerRadius={62} paddingAngle={2} stroke="none">
                     {conditionData.map(entry => <Cell key={entry.name} fill={entry.color} />)}
                   </Pie>
                   <Tooltip />
                 </PieChart>
-              </ResponsiveContainer>
+              </ResponsiveContainer> : <div aria-label="No pavement condition data" className="absolute left-2 top-2 h-[124px] w-[124px] rounded-full border-[15px] border-slate-200" />}
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                 <strong className="text-sm text-blue-900">{goodPercent}%</strong>
                 <span className="whitespace-nowrap text-[8px] leading-none tracking-wide text-slate-400">GOOD RATE</span>
@@ -264,10 +260,10 @@ export function Dashboard({ localRoadData, inspections, userName, onTabChange, a
             <span className="flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-[8px] text-blue-600"><Activity className="h-3 w-3" /> Active Cycle</span>
           </div>
           <ResponsiveContainer width="100%" height={145}>
-            <LineChart data={monthlyInspections} margin={{ top: 12, right: 8, bottom: 0, left: -20 }}>
+            <LineChart data={monthlyInspections.some(item => item.inspections > 0) ? monthlyInspections : monthlyInspections.map(item => ({ ...item, inspections: null }))} margin={{ top: 12, right: 8, bottom: 0, left: -20 }}>
               <CartesianGrid vertical={false} stroke="#e8eef7" strokeDasharray="3 3" />
               <XAxis dataKey="month" tick={{ fontSize: 8, fill: '#64748b' }} axisLine={false} tickLine={false} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 8, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 8, fill: '#64748b' }} axisLine={false} tickLine={false} domain={monthlyInspections.some(item => item.inspections > 0) ? [0, 'auto'] : [0, 4]} tickFormatter={monthlyInspections.some(item => item.inspections > 0) ? undefined : () => ''} />
               <Tooltip />
               <Line type="monotone" dataKey="inspections" stroke="#2563eb" strokeWidth={2} dot={{ r: 2.5, fill: 'white', strokeWidth: 1.5 }} activeDot={{ r: 4 }} />
             </LineChart>
